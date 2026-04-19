@@ -6,7 +6,6 @@
 #include <QLabel>
 #include <QTimer>
 #include <QButtonGroup>
-#include <QDockWidget>
 #include <QListWidget>
 #include <QSlider>
 #include "canvaswidget.h"
@@ -66,8 +65,8 @@ private:
     void setupSpriteView();
     void setupToolButtons();
     void createMenuBar();
-    void createLayerPanel();
     void createStatusBar();
+    void setupLayerPanel();      // теперь настраивает вкладку LayerTabe
     void setCurrentFrame(Frame *frame);
     Frame* currentFrame() const;
     Layer* currentLayer() const;
@@ -83,10 +82,8 @@ private:
     int m_currentFrameIndex = -1;
     QSize m_canvasSize = QSize(32, 32);
 
-    QDockWidget *m_layerDock;
-    QListWidget *m_layerList;
-    QSlider *m_layerOpacitySlider;
-    QAction *m_layerVisibleAction;
+    // Элементы панели слоёв (используем прямо из UI)
+    QListWidget *m_layerList;          // создаётся динамически и помещается в ui->frame
 
     QLabel *m_statusColorLabel;
     QLabel *m_statusColorIcon;

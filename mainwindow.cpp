@@ -10,7 +10,6 @@
 #include <QVBoxLayout>
 #include <QSpinBox>
 #include <QPushButton>
-#include <QListWidget>
 #include <QStatusBar>
 #include <QPainter>
 #include <QMessageBox>
@@ -32,10 +31,9 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
 
-    // Создаём меню
     createMenuBar();
 
-    // --- Настройка холста ---
+    // --- Холст ---
     QWidget *container = ui->ConvasWidget;
     if (!container) {
         container = new QWidget(ui->CanvasScrollArea);
@@ -52,13 +50,13 @@ MainWindow::MainWindow(QWidget *parent)
     canvasLayout->setContentsMargins(0, 0, 0, 0);
     container->setLayout(canvasLayout);
 
-    // Создаём первый кадр и слой
+    // Первый кадр и слой
     Frame *firstFrame = new Frame(m_canvasSize);
     firstFrame->addLayer(new Layer("Фон", m_canvasSize));
     m_frames.append(firstFrame);
     m_currentFrameIndex = 0;
 
-    // --- Палитра цветов ---
+    // --- Палитра ---
     QWidget *paletteContainer = ui->PaletteWidget;
     if (!paletteContainer) {
         paletteContainer = new QWidget(ui->ColorsTab);
@@ -71,9 +69,9 @@ MainWindow::MainWindow(QWidget *parent)
     paletteLayout->setContentsMargins(0, 0, 0, 0);
     paletteContainer->setLayout(paletteLayout);
 
+    // Связываем спинбоксы из UI
     QSpinBox *sizeSpinBox = ui->BitDepthSpin;
     if (sizeSpinBox) {
-        sizeSpinBox->setRange(1, 32);
         connect(sizeSpinBox, QOverload<int>::of(&QSpinBox::valueChanged),
                 m_colorPalette, &ColorPalette::setPaletteSize);
         m_colorPalette->setPaletteSize(sizeSpinBox->value());
@@ -83,8 +81,6 @@ MainWindow::MainWindow(QWidget *parent)
 
     QSpinBox *alphaSpinBox = ui->AlfaChannelSpin;
     if (alphaSpinBox) {
-        alphaSpinBox->setRange(0, 255);
-        alphaSpinBox->setValue(255);
         connect(alphaSpinBox, QOverload<int>::of(&QSpinBox::valueChanged),
                 m_canvasWidget, &CanvasWidget::setAlpha);
         m_canvasWidget->setAlpha(alphaSpinBox->value());
@@ -97,8 +93,6 @@ MainWindow::MainWindow(QWidget *parent)
 
     QSpinBox *brushSizeSpin = ui->BrushSizeSpin;
     if (brushSizeSpin) {
-        brushSizeSpin->setRange(1, 10);
-        brushSizeSpin->setValue(1);
         connect(brushSizeSpin, QOverload<int>::of(&QSpinBox::valueChanged),
                 m_canvasWidget, &CanvasWidget::setBrushSize);
         m_canvasWidget->setBrushSize(brushSizeSpin->value());
@@ -111,15 +105,16 @@ MainWindow::MainWindow(QWidget *parent)
         }
     });
 
-    // --- Навигационный виджет ---
+    // --- Навигация ---
     m_navigationWidget = new NavigationWidget(this);
     m_navigationWidget->setCanvasWidget(m_canvasWidget);
-    QVBoxLayout *toolsLayout = qobject_cast<QVBoxLayout*>(ui->ToolsTabe->layout());
-    if (toolsLayout) {
-        toolsLayout->addWidget(m_navigationWidget);
-    }
+    // Помещаем в существующий ui->NavigationWidget
+    QVBoxLayout *navLayout = new QVBoxLayout(ui->NavigationWidget);
+    navLayout->addWidget(m_navigationWidget);
+    navLayout->setContentsMargins(0, 0, 0, 0);
+    ui->NavigationWidget->setLayout(navLayout);
 
-    // --- Кнопки управления кадрами ---
+    // --- Кнопки кадров ---
     connect(ui->AddFramesButton, &QPushButton::clicked, this, &MainWindow::onAddFrame);
     connect(ui->ClearFramesButton, &QPushButton::clicked, this, &MainWindow::onClearFrame);
     connect(ui->PrevFrameButton, &QPushButton::clicked, this, &MainWindow::onPreviousFrame);
@@ -133,16 +128,9 @@ MainWindow::MainWindow(QWidget *parent)
 
     QSpinBox *fpsSpinBox = ui->num_fps;
     if (fpsSpinBox) {
-        fpsSpinBox->setRange(1, 120);
-        fpsSpinBox->setValue(m_animationFps);
         connect(fpsSpinBox, QOverload<int>::of(&QSpinBox::valueChanged),
                 this, &MainWindow::onFpsChanged);
     }
-
-    ui->ExportButton->setText(tr("Экспорт"));
-    ui->ImportButton->setText(tr("Импорт"));
-    ui->DeletFrameButton->setText(tr("Удалить кадр"));
-    ui->StatusLabel->setText(tr("Готов"));
 
     connect(ui->ExportButton, &QPushButton::clicked, this, &MainWindow::onExportSpriteSheet);
     connect(ui->ImportButton, &QPushButton::clicked, this, &MainWindow::onLoadProject);
@@ -174,16 +162,16 @@ MainWindow::MainWindow(QWidget *parent)
                            m_canvasWidget->alpha()));
     updateToolStatus(m_canvasWidget->tool());
 
-    // --- Панель слоёв ---
-    createLayerPanel();
+    // --- Панель слоёв (из UI) ---
+    setupLayerPanel();
 
     // --- Кадровая дорожка ---
     setupFrameLine();
 
-    // --- Спрайт (предпросмотр анимации) ---
+    // --- Спрайт ---
     setupSpriteView();
 
-    // Инициализация холста данными первого кадра
+    // Инициализация
     refreshCanvasFromFrame();
     updateFrameLine();
     updateLayerList();
@@ -219,44 +207,22 @@ void MainWindow::createMenuBar()
     connect(exportAtlasAct, &QAction::triggered, this, &MainWindow::onExportSpriteSheet);
 }
 
-void MainWindow::createLayerPanel()
+void MainWindow::setupLayerPanel()
 {
-    m_layerDock = new QDockWidget(tr("Слои"), this);
-    m_layerDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
-
-    QWidget *dockContent = new QWidget;
-    QVBoxLayout *layout = new QVBoxLayout(dockContent);
-
-    m_layerList = new QListWidget;
+    // Создаём список слоёв внутри существующего ui->frame
+    m_layerList = new QListWidget(ui->frame);
     m_layerList->setDragDropMode(QAbstractItemView::InternalMove);
-    layout->addWidget(m_layerList);
+    QVBoxLayout *frameLayout = new QVBoxLayout(ui->frame);
+    frameLayout->addWidget(m_layerList);
+    frameLayout->setContentsMargins(0, 0, 0, 0);
+    ui->frame->setLayout(frameLayout);
 
-    QHBoxLayout *btnLayout = new QHBoxLayout;
-    QPushButton *addBtn = new QPushButton(tr("+"));
-    QPushButton *delBtn = new QPushButton(tr("-"));
-    btnLayout->addWidget(addBtn);
-    btnLayout->addWidget(delBtn);
-    layout->addLayout(btnLayout);
-
-    QCheckBox *visibleCheck = new QCheckBox(tr("Видимый"));
-    visibleCheck->setChecked(true);
-    layout->addWidget(visibleCheck);
-
-    layout->addWidget(new QLabel(tr("Прозрачность:")));
-    m_layerOpacitySlider = new QSlider(Qt::Horizontal);
-    m_layerOpacitySlider->setRange(0, 255);
-    m_layerOpacitySlider->setValue(255);
-    layout->addWidget(m_layerOpacitySlider);
-
-    dockContent->setLayout(layout);
-    m_layerDock->setWidget(dockContent);
-    addDockWidget(Qt::RightDockWidgetArea, m_layerDock);
-
-    connect(addBtn, &QPushButton::clicked, this, &MainWindow::onNewLayer);
-    connect(delBtn, &QPushButton::clicked, this, &MainWindow::onDeleteLayer);
+    // Подключаем кнопки и контролы из UI
+    connect(ui->pushButton_6, &QPushButton::clicked, this, &MainWindow::onNewLayer);
+    connect(ui->pushButton_7, &QPushButton::clicked, this, &MainWindow::onDeleteLayer);
     connect(m_layerList, &QListWidget::currentRowChanged, this, &MainWindow::onLayerSelectionChanged);
-    connect(visibleCheck, &QCheckBox::toggled, this, &MainWindow::onLayerVisibilityChanged);
-    connect(m_layerOpacitySlider, &QSlider::valueChanged, this, &MainWindow::onLayerOpacityChanged);
+    connect(ui->checkBox, &QCheckBox::toggled, this, &MainWindow::onLayerVisibilityChanged);
+    connect(ui->horizontalSlider, &QSlider::valueChanged, this, &MainWindow::onLayerOpacityChanged);
 }
 
 void MainWindow::createStatusBar()
@@ -276,20 +242,20 @@ void MainWindow::setupToolButtons()
     m_toolButtonGroup = new QButtonGroup(this);
     m_toolButtonGroup->setExclusive(true);
 
-    m_toolButtonGroup->addButton(ui->toolBrush, CanvasWidget::Brush);
-    m_toolButtonGroup->addButton(ui->toolEraser, CanvasWidget::Eraser);
-    m_toolButtonGroup->addButton(ui->toolFill, CanvasWidget::Fill);
-    m_toolButtonGroup->addButton(ui->toolPicker, CanvasWidget::Picker);
-    m_toolButtonGroup->addButton(ui->toolBrush_2, CanvasWidget::Rectangle);
-    m_toolButtonGroup->addButton(ui->toolEraser_2, CanvasWidget::Ellipse);
-    m_toolButtonGroup->addButton(ui->toolFill_2, CanvasWidget::Line);
-    m_toolButtonGroup->addButton(ui->toolPicker_2, CanvasWidget::Triangle);
+    m_toolButtonGroup->addButton(ui->BrushButton, CanvasWidget::Brush);
+    m_toolButtonGroup->addButton(ui->EraserButton, CanvasWidget::Eraser);
+    m_toolButtonGroup->addButton(ui->FillButton, CanvasWidget::Fill);
+    m_toolButtonGroup->addButton(ui->PickerButton, CanvasWidget::Picker);
+    m_toolButtonGroup->addButton(ui->RectangleButton, CanvasWidget::Rectangle);
+    m_toolButtonGroup->addButton(ui->OvalButton, CanvasWidget::Ellipse);
+    m_toolButtonGroup->addButton(ui->LineButton, CanvasWidget::Line);
+    m_toolButtonGroup->addButton(ui->TriangleButton, CanvasWidget::Triangle);
 
     foreach (QAbstractButton *btn, m_toolButtonGroup->buttons()) {
         btn->setCheckable(true);
     }
 
-    ui->toolBrush->setChecked(true);
+    ui->BrushButton->setChecked(true);
 
     connect(m_toolButtonGroup, QOverload<int>::of(&QButtonGroup::idClicked),
             this, &MainWindow::onToolButtonClicked);
@@ -398,11 +364,11 @@ Layer* MainWindow::currentLayer() const
 
 void MainWindow::setupSpriteView()
 {
-    QWidget *spriteTab = ui->SpriteTabe;
-    QVBoxLayout *layout = new QVBoxLayout(spriteTab);
-    m_spriteWidget = new SpriteWidget(spriteTab);
+    m_spriteWidget = new SpriteWidget(ui->SpriteWidget);
+    QVBoxLayout *layout = new QVBoxLayout(ui->SpriteWidget);
     layout->addWidget(m_spriteWidget);
-    spriteTab->setLayout(layout);
+    layout->setContentsMargins(0, 0, 0, 0);
+    ui->SpriteWidget->setLayout(layout);
 }
 
 void MainWindow::onAddFrame()
@@ -548,11 +514,8 @@ void MainWindow::onLayerSelectionChanged()
 {
     Layer *layer = currentLayer();
     if (!layer) return;
-    QCheckBox *visibleCheck = m_layerDock->findChild<QCheckBox*>();
-    if (visibleCheck) {
-        visibleCheck->setChecked(layer->isVisible());
-    }
-    m_layerOpacitySlider->setValue(layer->opacity());
+    ui->checkBox->setChecked(layer->isVisible());
+    ui->horizontalSlider->setValue(layer->opacity());
 }
 
 void MainWindow::onLayerVisibilityChanged(bool visible)

@@ -7,37 +7,30 @@
 #include <QQueue>
 #include <QSet>
 
-CanvasWidget::CanvasWidget(QWidget *parent)
-    : QWidget(parent)
-{
+CanvasWidget::CanvasWidget(QWidget *parent): QWidget(parent) {
     setMouseTracking(true);
     setFixedSize(400, 400);
     setCanvasSize(QSize(32, 32));
 }
 
-void CanvasWidget::setCurrentColor(const QColor &color)
-{
+void CanvasWidget::setCurrentColor(const QColor &color) {
     m_currentRgb = color;
     emit currentColorChanged(QColor(m_currentRgb.red(), m_currentRgb.green(), m_currentRgb.blue(), m_alpha));
 }
 
-void CanvasWidget::setAlpha(int alpha)
-{
+void CanvasWidget::setAlpha(int alpha) {
     m_alpha = qBound(0, alpha, 255);
     emit currentColorChanged(QColor(m_currentRgb.red(), m_currentRgb.green(), m_currentRgb.blue(), m_alpha));
 }
 
-void CanvasWidget::setPixelSize(int size)
-{
+void CanvasWidget::setPixelSize(int size) {
     m_pixelSize = size;
-    setFixedSize(m_canvasSize.width() * m_pixelSize,
-                 m_canvasSize.height() * m_pixelSize);
+    setFixedSize(m_canvasSize.width() * m_pixelSize, m_canvasSize.height() * m_pixelSize);
     update();
     emit pixelSizeChanged(m_pixelSize);
 }
 
-void CanvasWidget::setCanvasSize(const QSize &size)
-{
+void CanvasWidget::setCanvasSize(const QSize &size) {
     m_canvasSize = size;
     m_image = QImage(size, QImage::Format_ARGB32);
     m_image.fill(Qt::transparent);
@@ -47,8 +40,7 @@ void CanvasWidget::setCanvasSize(const QSize &size)
     emit canvasChanged();
 }
 
-void CanvasWidget::setImage(const QImage &image)
-{
+void CanvasWidget::setImage(const QImage &image) {
     if (image.size() != m_canvasSize) {
         m_canvasSize = image.size();
         setFixedSize(m_canvasSize.width() * m_pixelSize, m_canvasSize.height() * m_pixelSize);
@@ -58,8 +50,7 @@ void CanvasWidget::setImage(const QImage &image)
     emit canvasChanged();
 }
 
-void CanvasWidget::setGhostLayer(const QImage &ghost)
-{
+void CanvasWidget::setGhostLayer(const QImage &ghost) {
     if (ghost.size() == m_canvasSize) {
         m_ghostImage = ghost;
     } else {
@@ -68,30 +59,26 @@ void CanvasWidget::setGhostLayer(const QImage &ghost)
     update();
 }
 
-void CanvasWidget::clearGhostLayer()
-{
+void CanvasWidget::clearGhostLayer() {
     m_ghostImage = QImage();
     update();
 }
 
-void CanvasWidget::setTool(Tool tool)
-{
+void CanvasWidget::setTool(Tool tool) {
     m_currentTool = tool;
     m_drawing = false;
     m_shapeActive = false;
     emit toolChanged(tool);
 }
 
-void CanvasWidget::setBrushSize(int size)
-{
+void CanvasWidget::setBrushSize(int size) {
     m_brushSize = qBound(1, size, 10);
 }
 
-void CanvasWidget::drawPixel(const QPoint &pixelPos)
-{
-    if (pixelPos.x() < 0 || pixelPos.x() >= m_canvasSize.width() ||
-        pixelPos.y() < 0 || pixelPos.y() >= m_canvasSize.height())
+void CanvasWidget::drawPixel(const QPoint &pixelPos) {
+    if (pixelPos.x() < 0 || pixelPos.x() >= m_canvasSize.width() || pixelPos.y() < 0 || pixelPos.y() >= m_canvasSize.height()) {
         return;
+    }
 
     QColor color(m_currentRgb.red(), m_currentRgb.green(), m_currentRgb.blue(), m_alpha);
     m_image.setPixelColor(pixelPos, color);
@@ -99,8 +86,7 @@ void CanvasWidget::drawPixel(const QPoint &pixelPos)
     emit canvasChanged();
 }
 
-void CanvasWidget::drawBrush(const QPoint &centerPixel)
-{
+void CanvasWidget::drawBrush(const QPoint &centerPixel) {
     int radius = m_brushSize - 1;
     QColor color(m_currentRgb.red(), m_currentRgb.green(), m_currentRgb.blue(), m_alpha);
     for (int dy = -radius; dy <= radius; ++dy) {
@@ -116,28 +102,27 @@ void CanvasWidget::drawBrush(const QPoint &centerPixel)
     emit canvasChanged();
 }
 
-void CanvasWidget::eraseAt(const QPoint &pixelPos)
-{
-    if (pixelPos.x() < 0 || pixelPos.x() >= m_canvasSize.width() ||
-        pixelPos.y() < 0 || pixelPos.y() >= m_canvasSize.height())
+void CanvasWidget::eraseAt(const QPoint &pixelPos) {
+    if (pixelPos.x() < 0 || pixelPos.x() >= m_canvasSize.width() || pixelPos.y() < 0 || pixelPos.y() >= m_canvasSize.height()) {
         return;
+    }
 
     m_image.setPixelColor(pixelPos, Qt::transparent);
     update();
     emit canvasChanged();
 }
 
-void CanvasWidget::floodFill(const QPoint &startPixel)
-{
-    if (startPixel.x() < 0 || startPixel.x() >= m_canvasSize.width() ||
-        startPixel.y() < 0 || startPixel.y() >= m_canvasSize.height())
+void CanvasWidget::floodFill(const QPoint &startPixel) {
+    if (startPixel.x() < 0 || startPixel.x() >= m_canvasSize.width() || startPixel.y() < 0 || startPixel.y() >= m_canvasSize.height()) {
         return;
+    }
 
     QColor targetColor = m_image.pixelColor(startPixel);
     QColor fillColor(m_currentRgb.red(), m_currentRgb.green(), m_currentRgb.blue(), m_alpha);
 
-    if (targetColor == fillColor)
+    if (targetColor == fillColor) {
         return;
+    }
 
     QQueue<QPoint> queue;
     QSet<QPoint> visited;
@@ -154,11 +139,9 @@ void CanvasWidget::floodFill(const QPoint &startPixel)
             QPoint(pt.x(), pt.y() + 1),
             QPoint(pt.x(), pt.y() - 1)
         };
+
         for (const QPoint &n : neighbors) {
-            if (n.x() >= 0 && n.x() < m_canvasSize.width() &&
-                n.y() >= 0 && n.y() < m_canvasSize.height() &&
-                !visited.contains(n) &&
-                m_image.pixelColor(n) == targetColor) {
+            if (n.x() >= 0 && n.x() < m_canvasSize.width() && n.y() >= 0 && n.y() < m_canvasSize.height() && !visited.contains(n) && m_image.pixelColor(n) == targetColor) {
                 queue.enqueue(n);
                 visited.insert(n);
             }
@@ -169,10 +152,8 @@ void CanvasWidget::floodFill(const QPoint &startPixel)
     emit canvasChanged();
 }
 
-void CanvasWidget::pickColorAt(const QPoint &pixelPos)
-{
-    if (pixelPos.x() < 0 || pixelPos.x() >= m_canvasSize.width() ||
-        pixelPos.y() < 0 || pixelPos.y() >= m_canvasSize.height())
+void CanvasWidget::pickColorAt(const QPoint &pixelPos) {
+    if (pixelPos.x() < 0 || pixelPos.x() >= m_canvasSize.width() || pixelPos.y() < 0 || pixelPos.y() >= m_canvasSize.height())
         return;
 
     QColor picked = m_image.pixelColor(pixelPos);
@@ -185,10 +166,10 @@ void CanvasWidget::pickColorAt(const QPoint &pixelPos)
     emit currentColorChanged(QColor(m_currentRgb.red(), m_currentRgb.green(), m_currentRgb.blue(), m_alpha));
 }
 
-void CanvasWidget::applyShape(const QPoint &start, const QPoint &end)
-{
-    if (start.x() < 0 || start.y() < 0 || end.x() < 0 || end.y() < 0)
+void CanvasWidget::applyShape(const QPoint &start, const QPoint &end) {
+    if (start.x() < 0 || start.y() < 0 || end.x() < 0 || end.y() < 0) {
         return;
+    }
 
     int x0 = start.x(), y0 = start.y();
     int x1 = end.x(), y1 = end.y();
