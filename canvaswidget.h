@@ -8,33 +8,37 @@
 
 class CanvasWidget : public QWidget {
     Q_OBJECT
+public:
+    explicit CanvasWidget(QWidget *parent = nullptr);
 
-    public:
-        explicit CanvasWidget(QWidget *parent = nullptr);
+    void setCurrentColor(const QColor &color);   // устанавливает цвет (без альфа)
+    QColor currentColor() const { return m_currentRgb; }
 
-        void setCurrentColor(const QColor &color) { m_currentColor = color; }
-        QColor currentColor() const { return m_currentColor; }
+    void setAlpha(int alpha);                    // прозрачность 0..255
+    int alpha() const { return m_alpha; }
 
-        void setPixelSize(int size);                // размер одного пикселя в пикселях экрана
-        void setCanvasSize(int width, int height);  // размер холста в пикселях (логических)
+    void setPixelSize(int size);
+    void setCanvasSize(int width, int height);
 
-        QSize canvasSize() const { return m_canvasSize; }
+    QSize canvasSize() const { return m_canvasSize; }
 
-    protected:
-        void paintEvent(QPaintEvent *event) override;
-        void mousePressEvent(QMouseEvent *event) override;
-        void mouseMoveEvent(QMouseEvent *event) override;
-        void wheelEvent(QWheelEvent *event) override;   // масштабирование
+protected:
+    void paintEvent(QPaintEvent *event) override;
+    void mousePressEvent(QMouseEvent *event) override;
+    void mouseMoveEvent(QMouseEvent *event) override;
+    void wheelEvent(QWheelEvent *event) override;
 
-    private:
-        void drawPixel(const QPoint &pixelPos);
-        QPoint pixelFromPoint(const QPoint &point) const;
+private:
+    void drawPixel(const QPoint &pixelPos);
+    QPoint pixelFromPoint(const QPoint &point) const;
+    void drawCheckerboard(QPainter &painter);   // шахматная доска для прозрачности
 
-        QVector<QVector<QColor>> m_pixels;  // двумерный массив цветов
-        QSize m_canvasSize;                 // количество пикселей по ширине и высоте
-        int m_pixelSize = 10;               // размер отображения одного пикселя (zoom)
-        QColor m_currentColor = Qt::black;
-        bool m_drawing = false;
+    QVector<QVector<QColor>> m_pixels;          // хранятся цвета с альфа-каналом
+    QSize m_canvasSize;
+    int m_pixelSize = 10;
+    QColor m_currentRgb = Qt::black;            // цвет без альфа
+    int m_alpha = 255;                          // текущая прозрачность
+    bool m_drawing = false;
 };
 
 #endif // CANVASWIDGET_H
