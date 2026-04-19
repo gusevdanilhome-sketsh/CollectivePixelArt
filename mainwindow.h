@@ -4,8 +4,10 @@
 #include <QMainWindow>
 #include <QList>
 #include <QLabel>
+#include <QTimer>
 #include "canvaswidget.h"
 #include "colorpalette.h"
+#include "spritewidget.h"   // <-- новый заголовок
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -22,31 +24,37 @@ public:
     ~MainWindow() override;
 
 private slots:
-    // Слоты для кнопок управления кадрами
-    void onAddFrame();        // Добавить текущий кадр
-    void onClearFrame();      // Очистить холст
-    void onPreviousFrame();   // Перейти к предыдущему кадру
-    void onNextFrame();       // Перейти к следующему кадру
+    void onAddFrame();
+    void onClearFrame();
+    void onPreviousFrame();
+    void onNextFrame();
 
-    // Обновление статус-бара при смене цвета
+    void onPlayAnimation();
+    void onStopAnimation();
+    void onAnimationTick();
+    void onFpsChanged(int fps);
+
     void updateStatusBar(const QColor &color);
 
 private:
-    void setupFrameLine();    // Инициализация отображения кадров
-    void updateFrameLine();   // Обновить миниатюры кадров в frameline
-    void loadFrame(int index);// Загрузить кадр по индексу в холст
+    void setupFrameLine();
+    void updateFrameLine();
+    void loadFrame(int index);
+    void setupSpriteView();
 
     Ui::MainWindow *ui;
     CanvasWidget *m_canvasWidget;
     ColorPalette *m_colorPalette;
+    SpriteWidget *m_spriteWidget;   // <-- виджет для предпросмотра
 
-    // Хранилище кадров (копии массивов пикселей)
     QList<QVector<QVector<QColor>>> m_frames;
-    int m_currentFrameIndex = -1; // Индекс текущего отображаемого кадра, -1 если не выбран
+    int m_currentFrameIndex = -1;
 
-    // Элементы статус-бара
-    QLabel *m_statusColorLabel;   // Текст с кодом цвета
-    QLabel *m_statusColorIcon;    // Иконка цвета
+    QLabel *m_statusColorLabel;
+    QLabel *m_statusColorIcon;
+
+    QTimer *m_animationTimer;
+    int m_animationFps = 12;
 };
 
 #endif // MAINWINDOW_H

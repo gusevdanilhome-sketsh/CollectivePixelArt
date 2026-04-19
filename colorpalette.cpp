@@ -13,7 +13,7 @@ ColorPalette::ColorPalette(CanvasWidget *canvas, QWidget *parent)
 
 void ColorPalette::setPaletteSize(int size)
 {
-    if (size == m_paletteSize || size < 1 || size > 32)  // Максимум 32
+    if (size == m_paletteSize || size < 1 || size > 32)
         return;
     m_paletteSize = size;
     generatePalette();
