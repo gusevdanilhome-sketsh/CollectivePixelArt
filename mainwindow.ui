@@ -68,26 +68,51 @@
           <height>16777215</height>
          </size>
         </property>
-        <widget class="QWidget" name="tab">
+        <property name="currentIndex">
+         <number>1</number>
+        </property>
+        <widget class="QWidget" name="files">
          <attribute name="title">
-          <string>Tab 1</string>
+          <string>Файлы</string>
          </attribute>
         </widget>
-        <widget class="QWidget" name="tab_2">
+        <widget class="QWidget" name="cvs">
          <attribute name="title">
-          <string>Tab 2</string>
+          <string>CVS</string>
          </attribute>
         </widget>
        </widget>
        <widget class="QTabWidget" name="framecontrol">
-        <widget class="QWidget" name="tab_7">
+        <property name="currentIndex">
+         <number>0</number>
+        </property>
+        <widget class="QWidget" name="convas">
          <attribute name="title">
-          <string>Tab 1</string>
+          <string>Холст</string>
          </attribute>
+         <layout class="QGridLayout" name="gridLayout_2">
+          <item row="0" column="0">
+           <widget class="QScrollArea" name="scrollAreaCanvas">
+            <property name="widgetResizable">
+             <bool>true</bool>
+            </property>
+            <widget class="QWidget" name="canvasContainer">
+             <property name="geometry">
+              <rect>
+               <x>0</x>
+               <y>0</y>
+               <width>870</width>
+               <height>657</height>
+              </rect>
+             </property>
+            </widget>
+           </widget>
+          </item>
+         </layout>
         </widget>
-        <widget class="QWidget" name="tab_8">
+        <widget class="QWidget" name="sprite">
          <attribute name="title">
-          <string>Tab 2</string>
+          <string>Спрайт</string>
          </attribute>
         </widget>
        </widget>
@@ -110,14 +135,17 @@
           <height>16777215</height>
          </size>
         </property>
-        <widget class="QWidget" name="tab_3">
+        <property name="currentIndex">
+         <number>0</number>
+        </property>
+        <widget class="QWidget" name="colors">
          <attribute name="title">
-          <string>Tab 1</string>
+          <string>Цвет</string>
          </attribute>
         </widget>
-        <widget class="QWidget" name="tab_4">
+        <widget class="QWidget" name="tools">
          <attribute name="title">
-          <string>Tab 2</string>
+          <string>Инструменты</string>
          </attribute>
         </widget>
        </widget>
@@ -141,14 +169,17 @@
          <height>300</height>
         </size>
        </property>
-       <widget class="QWidget" name="tab_5">
+       <property name="currentIndex">
+        <number>1</number>
+       </property>
+       <widget class="QWidget" name="frameline">
         <attribute name="title">
-         <string>Tab 1</string>
+         <string>Кадровая дорожка</string>
         </attribute>
        </widget>
-       <widget class="QWidget" name="tab_6">
+       <widget class="QWidget" name="settings">
         <attribute name="title">
-         <string>Tab 2</string>
+         <string>Настройки</string>
         </attribute>
        </widget>
       </widget>

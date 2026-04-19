@@ -11,6 +11,8 @@ qt_add_executable(CollectivePixelArt
     mainwindow.cpp
     mainwindow.h
     mainwindow.ui
+    canvaswidget.h canvaswidget.cpp
+    colorpalette.h colorpalette.cpp
 )
 
 qt_add_translations(
