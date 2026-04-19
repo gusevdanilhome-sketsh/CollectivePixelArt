@@ -13,7 +13,7 @@ ColorPalette::ColorPalette(CanvasWidget *canvas, QWidget *parent)
 
 void ColorPalette::setPaletteSize(int size)
 {
-    if (size == m_paletteSize || size < 1 || size > 16)
+    if (size == m_paletteSize || size < 1 || size > 32)  // Максимум 32
         return;
     m_paletteSize = size;
     generatePalette();
@@ -21,7 +21,6 @@ void ColorPalette::setPaletteSize(int size)
 
 void ColorPalette::generatePalette()
 {
-    // Очищаем layout
     QLayoutItem *child;
     while ((child = m_layout->takeAt(0)) != nullptr) {
         delete child->widget();
@@ -46,7 +45,6 @@ void ColorPalette::generatePalette()
 
 QColor ColorPalette::getColorForIndex(int row, int col, int size) const
 {
-    // Равномерное распределение оттенка по всей сетке
     double hue = (static_cast<double>(row * size + col) / (size * size)) * 360.0;
     return QColor::fromHsvF(hue / 360.0, 0.8, 0.9);
 }

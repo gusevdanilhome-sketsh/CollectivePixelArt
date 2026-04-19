@@ -15,12 +15,15 @@ CanvasWidget::CanvasWidget(QWidget *parent)
 
 void CanvasWidget::setCurrentColor(const QColor &color)
 {
-    m_currentRgb = color;   // сохраняем только RGB, альфа отдельно
+    m_currentRgb = color;
+    // Испускаем сигнал, чтобы статус-бар обновился.
+    emit currentColorChanged(QColor(m_currentRgb.red(), m_currentRgb.green(), m_currentRgb.blue(), m_alpha));
 }
 
 void CanvasWidget::setAlpha(int alpha)
 {
     m_alpha = qBound(0, alpha, 255);
+    emit currentColorChanged(QColor(m_currentRgb.red(), m_currentRgb.green(), m_currentRgb.blue(), m_alpha));
 }
 
 void CanvasWidget::setPixelSize(int size)
@@ -38,16 +41,44 @@ void CanvasWidget::setCanvasSize(int width, int height)
     for (int i = 0; i < height; ++i) {
         m_pixels[i].resize(width);
         for (int j = 0; j < width; ++j) {
-            m_pixels[i][j] = Qt::transparent; // полностью прозрачный
+            m_pixels[i][j] = Qt::transparent;
         }
     }
     setFixedSize(width * m_pixelSize, height * m_pixelSize);
     update();
 }
 
+void CanvasWidget::applyGhostEffect(float factor)
+{
+    for (int y = 0; y < m_canvasSize.height(); ++y) {
+        for (int x = 0; x < m_canvasSize.width(); ++x) {
+            QColor &col = m_pixels[y][x];
+            if (col.alpha() > 0) {
+                int newAlpha = qBound(0, static_cast<int>(col.alpha() * factor), 255);
+                col.setAlpha(newAlpha);
+            }
+        }
+    }
+    update();
+}
+
+QVector<QVector<QColor>> CanvasWidget::getPixelsCopy() const
+{
+    return m_pixels; // Возвращаем копию (благодаря QVector)
+}
+
+void CanvasWidget::setPixels(const QVector<QVector<QColor>> &pixels)
+{
+    // Проверяем, что размеры совпадают
+    if (pixels.size() == m_canvasSize.height() && !pixels.isEmpty() && pixels[0].size() == m_canvasSize.width()) {
+        m_pixels = pixels;
+        update();
+    }
+}
+
 void CanvasWidget::drawCheckerboard(QPainter &painter)
 {
-    const int cellSize = 10; // размер клетки шахматной доски
+    const int cellSize = 10;
     for (int y = 0; y < height(); y += cellSize) {
         for (int x = 0; x < width(); x += cellSize) {
             bool white = ((x / cellSize) + (y / cellSize)) % 2 == 0;
@@ -60,22 +91,18 @@ void CanvasWidget::drawCheckerboard(QPainter &painter)
 void CanvasWidget::paintEvent(QPaintEvent *event)
 {
     QPainter painter(this);
-
-    // 1. Рисуем шахматную доску (фон для прозрачности)
     drawCheckerboard(painter);
 
-    // 2. Рисуем пиксели холста
     for (int y = 0; y < m_canvasSize.height(); ++y) {
         for (int x = 0; x < m_canvasSize.width(); ++x) {
             const QColor &col = m_pixels[y][x];
-            if (col.alpha() > 0) {  // рисуем только непрозрачные/полупрозрачные
+            if (col.alpha() > 0) {
                 painter.fillRect(x * m_pixelSize, y * m_pixelSize,
                                  m_pixelSize, m_pixelSize, col);
             }
         }
     }
 
-    // 3. Рисуем сетку поверх
     painter.setPen(QPen(Qt::black, 1));
     for (int x = 0; x <= m_canvasSize.width(); ++x) {
         painter.drawLine(x * m_pixelSize, 0,
@@ -102,7 +129,6 @@ void CanvasWidget::drawPixel(const QPoint &pixelPos)
     if (pixelPos.x() < 0 || pixelPos.y() < 0)
         return;
 
-    // Создаём цвет с текущими RGB и альфа-каналом
     QColor color(m_currentRgb.red(), m_currentRgb.green(), m_currentRgb.blue(), m_alpha);
     m_pixels[pixelPos.y()][pixelPos.x()] = color;
     update();

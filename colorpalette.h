@@ -12,7 +12,7 @@ class ColorPalette : public QWidget
     Q_OBJECT
 public:
     explicit ColorPalette(CanvasWidget *canvas, QWidget *parent = nullptr);
-    void setPaletteSize(int size);   // размер сетки size x size
+    void setPaletteSize(int size);   // размер сетки size x size (до 32)
 
 private slots:
     void onColorSelected(const QColor &color);
