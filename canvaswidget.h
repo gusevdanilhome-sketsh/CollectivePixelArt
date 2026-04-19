@@ -3,17 +3,21 @@
 
 #include <QWidget>
 #include <QColor>
-#include <QVector>
+#include <QImage>
 #include <QPoint>
 
 class CanvasWidget : public QWidget {
     Q_OBJECT
 public:
     enum Tool {
-        Brush,      // Обычная кисть
-        Eraser,     // Ластик (рисует прозрачным)
-        Fill,       // Заливка области
-        Picker      // Пипетка (выбор цвета)
+        Brush,
+        Eraser,
+        Fill,
+        Picker,
+        Rectangle,
+        Ellipse,
+        Line,
+        Triangle
     };
     Q_ENUM(Tool)
 
@@ -26,25 +30,29 @@ public:
     int alpha() const { return m_alpha; }
 
     void setPixelSize(int size);
-    void setCanvasSize(int width, int height);
+    int pixelSize() const { return m_pixelSize; }
+
+    void setCanvasSize(const QSize &size);
     QSize canvasSize() const { return m_canvasSize; }
 
-    void setGhostLayer(const QVector<QVector<QColor>> &ghostPixels);
+    void setImage(const QImage &image);
+    QImage image() const { return m_image; }
+
+    void setGhostLayer(const QImage &ghost);
     void clearGhostLayer();
-    QVector<QVector<QColor>> createGhostFromCurrent(float factor = 0.5f) const;
 
-    QVector<QVector<QColor>> getPixelsCopy() const;
-    void setPixels(const QVector<QVector<QColor>> &pixels);
-
-    // Инструменты
     void setTool(Tool tool);
     Tool tool() const { return m_currentTool; }
-    void setBrushSize(int size);   // Размер кисти (в пикселях холста)
+    void setBrushSize(int size);
 
 signals:
     void currentColorChanged(const QColor &color);
     void canvasChanged();
-    void colorPicked(const QColor &color); // Сигнал при использовании пипетки
+    void colorPicked(const QColor &color);
+    void toolChanged(Tool tool);
+    void viewportChanged();
+    void pixelSizeChanged(int size);
+    void sizeChanged(const QSize &size);
 
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -52,6 +60,7 @@ protected:
     void mouseMoveEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
     void wheelEvent(QWheelEvent *event) override;
+    void resizeEvent(QResizeEvent *event) override;
 
 private:
     void drawPixel(const QPoint &pixelPos);
@@ -59,11 +68,13 @@ private:
     void eraseAt(const QPoint &pixelPos);
     void floodFill(const QPoint &startPixel);
     void pickColorAt(const QPoint &pixelPos);
+    void applyShape(const QPoint &start, const QPoint &end);
     QPoint pixelFromPoint(const QPoint &point) const;
     void drawCheckerboard(QPainter &painter);
+    void drawShapePreview(QPainter &painter);
 
-    QVector<QVector<QColor>> m_pixels;
-    QVector<QVector<QColor>> m_ghostPixels;
+    QImage m_image;
+    QImage m_ghostImage;
     QSize m_canvasSize;
     int m_pixelSize = 10;
     QColor m_currentRgb = Qt::black;
@@ -71,8 +82,11 @@ private:
     bool m_drawing = false;
 
     Tool m_currentTool = Brush;
-    int m_brushSize = 1;            // Радиус в пикселях холста (1 = 1x1, 2 = 3x3 и т.д.)
-    QPoint m_lastDrawnPixel;        // Последняя отрисованная позиция (для сглаживания линий)
+    int m_brushSize = 1;
+    QPoint m_lastDrawnPixel;
+    QPoint m_shapeStart;
+    QPoint m_shapeCurrent;
+    bool m_shapeActive = false;
 };
 
 #endif // CANVASWIDGET_H

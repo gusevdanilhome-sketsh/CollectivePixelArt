@@ -3,6 +3,9 @@
 #include "canvaswidget.h"
 #include "colorpalette.h"
 #include "spritewidget.h"
+#include "navigationwidget.h"
+#include "frame.h"
+#include "layer.h"
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QSpinBox>
@@ -12,6 +15,16 @@
 #include <QPainter>
 #include <QMessageBox>
 #include <QButtonGroup>
+#include <QMenuBar>
+#include <QFileDialog>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
+#include <QBuffer>
+#include <QInputDialog>
+#include <QSlider>
+#include <QLabel>
+#include <QCheckBox>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -19,15 +32,18 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
 
+    // Создаём меню
+    createMenuBar();
+
     // --- Настройка холста ---
-    QWidget *container = ui->m_canvas;
+    QWidget *container = ui->ConvasWidget;
     if (!container) {
-        container = new QWidget(ui->scrollAreaCanvas);
-        ui->scrollAreaCanvas->setWidget(container);
+        container = new QWidget(ui->CanvasScrollArea);
+        ui->CanvasScrollArea->setWidget(container);
     }
 
     m_canvasWidget = new CanvasWidget(container);
-    m_canvasWidget->setCanvasSize(32, 32);
+    m_canvasWidget->setCanvasSize(m_canvasSize);
     m_canvasWidget->setPixelSize(16);
 
     QHBoxLayout *canvasLayout = new QHBoxLayout(container);
@@ -36,10 +52,16 @@ MainWindow::MainWindow(QWidget *parent)
     canvasLayout->setContentsMargins(0, 0, 0, 0);
     container->setLayout(canvasLayout);
 
+    // Создаём первый кадр и слой
+    Frame *firstFrame = new Frame(m_canvasSize);
+    firstFrame->addLayer(new Layer("Фон", m_canvasSize));
+    m_frames.append(firstFrame);
+    m_currentFrameIndex = 0;
+
     // --- Палитра цветов ---
-    QWidget *paletteContainer = ui->palette;
+    QWidget *paletteContainer = ui->PaletteWidget;
     if (!paletteContainer) {
-        paletteContainer = new QWidget(ui->colors);
+        paletteContainer = new QWidget(ui->ColorsTab);
         ui->gridLayout_3->addWidget(paletteContainer, 2, 0);
     }
 
@@ -49,7 +71,7 @@ MainWindow::MainWindow(QWidget *parent)
     paletteLayout->setContentsMargins(0, 0, 0, 0);
     paletteContainer->setLayout(paletteLayout);
 
-    QSpinBox *sizeSpinBox = ui->palettesize;
+    QSpinBox *sizeSpinBox = ui->BitDepthSpin;
     if (sizeSpinBox) {
         sizeSpinBox->setRange(1, 32);
         connect(sizeSpinBox, QOverload<int>::of(&QSpinBox::valueChanged),
@@ -59,7 +81,7 @@ MainWindow::MainWindow(QWidget *parent)
         m_colorPalette->setPaletteSize(16);
     }
 
-    QSpinBox *alphaSpinBox = ui->spinBox;
+    QSpinBox *alphaSpinBox = ui->AlfaChannelSpin;
     if (alphaSpinBox) {
         alphaSpinBox->setRange(0, 255);
         alphaSpinBox->setValue(255);
@@ -70,20 +92,10 @@ MainWindow::MainWindow(QWidget *parent)
         m_canvasWidget->setAlpha(255);
     }
 
-    // --- Инструменты рисования ---
-    QButtonGroup *toolGroup = new QButtonGroup(this);
-    toolGroup->addButton(ui->toolBrush, static_cast<int>(CanvasWidget::Brush));
-    toolGroup->addButton(ui->toolEraser, static_cast<int>(CanvasWidget::Eraser));
-    toolGroup->addButton(ui->toolFill, static_cast<int>(CanvasWidget::Fill));
-    toolGroup->addButton(ui->toolPicker, static_cast<int>(CanvasWidget::Picker));
+    // --- Инструменты ---
+    setupToolButtons();
 
-    connect(toolGroup, QOverload<QAbstractButton *>::of(&QButtonGroup::buttonClicked),
-            this, [this](QAbstractButton *button) {
-                int id = button->group()->id(button);
-                m_canvasWidget->setTool(static_cast<CanvasWidget::Tool>(id));
-            });
-
-    QSpinBox *brushSizeSpin = ui->brushSizeSpinBox;
+    QSpinBox *brushSizeSpin = ui->BrushSizeSpin;
     if (brushSizeSpin) {
         brushSizeSpin->setRange(1, 10);
         brushSizeSpin->setValue(1);
@@ -93,23 +105,31 @@ MainWindow::MainWindow(QWidget *parent)
     }
 
     connect(m_canvasWidget, &CanvasWidget::colorPicked, this, [this](const QColor &color) {
-        QSpinBox *alphaSpin = ui->spinBox;
+        QSpinBox *alphaSpin = ui->AlfaChannelSpin;
         if (alphaSpin) {
             alphaSpin->setValue(color.alpha());
         }
     });
 
+    // --- Навигационный виджет ---
+    m_navigationWidget = new NavigationWidget(this);
+    m_navigationWidget->setCanvasWidget(m_canvasWidget);
+    QVBoxLayout *toolsLayout = qobject_cast<QVBoxLayout*>(ui->ToolsTabe->layout());
+    if (toolsLayout) {
+        toolsLayout->addWidget(m_navigationWidget);
+    }
+
     // --- Кнопки управления кадрами ---
-    connect(ui->addframes, &QPushButton::clicked, this, &MainWindow::onAddFrame);
-    connect(ui->clearframes, &QPushButton::clicked, this, &MainWindow::onClearFrame);
-    connect(ui->prevframe, &QPushButton::clicked, this, &MainWindow::onPreviousFrame);
-    connect(ui->nextframe, &QPushButton::clicked, this, &MainWindow::onNextFrame);
+    connect(ui->AddFramesButton, &QPushButton::clicked, this, &MainWindow::onAddFrame);
+    connect(ui->ClearFramesButton, &QPushButton::clicked, this, &MainWindow::onClearFrame);
+    connect(ui->PrevFrameButton, &QPushButton::clicked, this, &MainWindow::onPreviousFrame);
+    connect(ui->NextFrameButton, &QPushButton::clicked, this, &MainWindow::onNextFrame);
 
     // --- Анимация ---
     m_animationTimer = new QTimer(this);
     connect(m_animationTimer, &QTimer::timeout, this, &MainWindow::onAnimationTick);
-    connect(ui->pushButton, &QPushButton::clicked, this, &MainWindow::onPlayAnimation);
-    connect(ui->pushButton_2, &QPushButton::clicked, this, &MainWindow::onStopAnimation);
+    connect(ui->StattButton, &QPushButton::clicked, this, &MainWindow::onPlayAnimation);
+    connect(ui->StopButton, &QPushButton::clicked, this, &MainWindow::onStopAnimation);
 
     QSpinBox *fpsSpinBox = ui->num_fps;
     if (fpsSpinBox) {
@@ -119,45 +139,43 @@ MainWindow::MainWindow(QWidget *parent)
                 this, &MainWindow::onFpsChanged);
     }
 
-    ui->pushButton_3->setText(tr("Экспорт"));
-    ui->pushButton_4->setText(tr("Импорт"));
-    ui->pushButton_5->setText(tr("Удалить кадр"));
-    ui->label->setText(tr("Готов"));
+    ui->ExportButton->setText(tr("Экспорт"));
+    ui->ImportButton->setText(tr("Импорт"));
+    ui->DeletFrameButton->setText(tr("Удалить кадр"));
+    ui->StatusLabel->setText(tr("Готов"));
 
-    connect(ui->pushButton_3, &QPushButton::clicked, []() {
-        QMessageBox::information(nullptr, "Экспорт", "Функция в разработке");
-    });
-    connect(ui->pushButton_4, &QPushButton::clicked, []() {
-        QMessageBox::information(nullptr, "Импорт", "Функция в разработке");
-    });
-    connect(ui->pushButton_5, &QPushButton::clicked, [this]() {
+    connect(ui->ExportButton, &QPushButton::clicked, this, &MainWindow::onExportSpriteSheet);
+    connect(ui->ImportButton, &QPushButton::clicked, this, &MainWindow::onLoadProject);
+    connect(ui->DeletFrameButton, &QPushButton::clicked, [this]() {
         if (!m_frames.isEmpty() && m_currentFrameIndex >= 0) {
-            m_frames.removeAt(m_currentFrameIndex);
+            delete m_frames.takeAt(m_currentFrameIndex);
             updateFrameLine();
             if (m_frames.isEmpty()) {
-                m_canvasWidget->setCanvasSize(m_canvasWidget->canvasSize().width(),
-                                              m_canvasWidget->canvasSize().height());
-                m_currentFrameIndex = -1;
-                m_spriteWidget->clear();
+                Frame *newFrame = new Frame(m_canvasSize);
+                newFrame->addLayer(new Layer("Фон", m_canvasSize));
+                m_frames.append(newFrame);
+                m_currentFrameIndex = 0;
             } else {
                 m_currentFrameIndex = qMin(m_currentFrameIndex, m_frames.size() - 1);
                 loadFrame(m_currentFrameIndex);
             }
+            refreshCanvasFromFrame();
+            m_spriteWidget->setFrame(currentFrame()->compositeImage());
         }
     });
 
     // --- Статус-бар ---
-    m_statusColorLabel = new QLabel(this);
-    m_statusColorIcon = new QLabel(this);
-    m_statusColorIcon->setFixedSize(20, 20);
-    statusBar()->addPermanentWidget(m_statusColorIcon);
-    statusBar()->addPermanentWidget(m_statusColorLabel);
-
+    createStatusBar();
     connect(m_canvasWidget, &CanvasWidget::currentColorChanged, this, &MainWindow::updateStatusBar);
+    connect(m_canvasWidget, &CanvasWidget::toolChanged, this, &MainWindow::updateToolStatus);
     updateStatusBar(QColor(m_canvasWidget->currentColor().red(),
                            m_canvasWidget->currentColor().green(),
                            m_canvasWidget->currentColor().blue(),
                            m_canvasWidget->alpha()));
+    updateToolStatus(m_canvasWidget->tool());
+
+    // --- Панель слоёв ---
+    createLayerPanel();
 
     // --- Кадровая дорожка ---
     setupFrameLine();
@@ -165,24 +183,134 @@ MainWindow::MainWindow(QWidget *parent)
     // --- Спрайт (предпросмотр анимации) ---
     setupSpriteView();
 
-    ui->prevframe->setEnabled(false);
-    ui->nextframe->setEnabled(false);
+    // Инициализация холста данными первого кадра
+    refreshCanvasFromFrame();
+    updateFrameLine();
+    updateLayerList();
+
+    ui->PrevFrameButton->setEnabled(false);
+    ui->NextFrameButton->setEnabled(false);
 }
 
 MainWindow::~MainWindow()
 {
+    qDeleteAll(m_frames);
     delete ui;
+}
+
+void MainWindow::createMenuBar()
+{
+    QMenu *fileMenu = menuBar()->addMenu(tr("&Файл"));
+
+    QAction *newProjectAct = fileMenu->addAction(tr("Новый проект..."));
+    connect(newProjectAct, &QAction::triggered, this, &MainWindow::onNewProject);
+
+    fileMenu->addSeparator();
+
+    QAction *saveAct = fileMenu->addAction(tr("Сохранить проект..."));
+    connect(saveAct, &QAction::triggered, this, &MainWindow::onSaveProject);
+
+    QAction *loadAct = fileMenu->addAction(tr("Загрузить проект..."));
+    connect(loadAct, &QAction::triggered, this, &MainWindow::onLoadProject);
+
+    fileMenu->addSeparator();
+
+    QAction *exportAtlasAct = fileMenu->addAction(tr("Экспорт атласа..."));
+    connect(exportAtlasAct, &QAction::triggered, this, &MainWindow::onExportSpriteSheet);
+}
+
+void MainWindow::createLayerPanel()
+{
+    m_layerDock = new QDockWidget(tr("Слои"), this);
+    m_layerDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
+
+    QWidget *dockContent = new QWidget;
+    QVBoxLayout *layout = new QVBoxLayout(dockContent);
+
+    m_layerList = new QListWidget;
+    m_layerList->setDragDropMode(QAbstractItemView::InternalMove);
+    layout->addWidget(m_layerList);
+
+    QHBoxLayout *btnLayout = new QHBoxLayout;
+    QPushButton *addBtn = new QPushButton(tr("+"));
+    QPushButton *delBtn = new QPushButton(tr("-"));
+    btnLayout->addWidget(addBtn);
+    btnLayout->addWidget(delBtn);
+    layout->addLayout(btnLayout);
+
+    QCheckBox *visibleCheck = new QCheckBox(tr("Видимый"));
+    visibleCheck->setChecked(true);
+    layout->addWidget(visibleCheck);
+
+    layout->addWidget(new QLabel(tr("Прозрачность:")));
+    m_layerOpacitySlider = new QSlider(Qt::Horizontal);
+    m_layerOpacitySlider->setRange(0, 255);
+    m_layerOpacitySlider->setValue(255);
+    layout->addWidget(m_layerOpacitySlider);
+
+    dockContent->setLayout(layout);
+    m_layerDock->setWidget(dockContent);
+    addDockWidget(Qt::RightDockWidgetArea, m_layerDock);
+
+    connect(addBtn, &QPushButton::clicked, this, &MainWindow::onNewLayer);
+    connect(delBtn, &QPushButton::clicked, this, &MainWindow::onDeleteLayer);
+    connect(m_layerList, &QListWidget::currentRowChanged, this, &MainWindow::onLayerSelectionChanged);
+    connect(visibleCheck, &QCheckBox::toggled, this, &MainWindow::onLayerVisibilityChanged);
+    connect(m_layerOpacitySlider, &QSlider::valueChanged, this, &MainWindow::onLayerOpacityChanged);
+}
+
+void MainWindow::createStatusBar()
+{
+    m_statusColorIcon = new QLabel(this);
+    m_statusColorIcon->setFixedSize(20, 20);
+    m_statusColorLabel = new QLabel(this);
+    m_statusToolLabel = new QLabel(this);
+
+    statusBar()->addPermanentWidget(m_statusColorIcon);
+    statusBar()->addPermanentWidget(m_statusColorLabel);
+    statusBar()->addWidget(m_statusToolLabel);
+}
+
+void MainWindow::setupToolButtons()
+{
+    m_toolButtonGroup = new QButtonGroup(this);
+    m_toolButtonGroup->setExclusive(true);
+
+    m_toolButtonGroup->addButton(ui->toolBrush, CanvasWidget::Brush);
+    m_toolButtonGroup->addButton(ui->toolEraser, CanvasWidget::Eraser);
+    m_toolButtonGroup->addButton(ui->toolFill, CanvasWidget::Fill);
+    m_toolButtonGroup->addButton(ui->toolPicker, CanvasWidget::Picker);
+    m_toolButtonGroup->addButton(ui->toolBrush_2, CanvasWidget::Rectangle);
+    m_toolButtonGroup->addButton(ui->toolEraser_2, CanvasWidget::Ellipse);
+    m_toolButtonGroup->addButton(ui->toolFill_2, CanvasWidget::Line);
+    m_toolButtonGroup->addButton(ui->toolPicker_2, CanvasWidget::Triangle);
+
+    foreach (QAbstractButton *btn, m_toolButtonGroup->buttons()) {
+        btn->setCheckable(true);
+    }
+
+    ui->toolBrush->setChecked(true);
+
+    connect(m_toolButtonGroup, QOverload<int>::of(&QButtonGroup::idClicked),
+            this, &MainWindow::onToolButtonClicked);
+}
+
+void MainWindow::onToolButtonClicked(int id)
+{
+    CanvasWidget::Tool tool = static_cast<CanvasWidget::Tool>(id);
+    m_canvasWidget->setTool(tool);
 }
 
 void MainWindow::setupFrameLine()
 {
-    QWidget *container = ui->widget;
+    QWidget *container = ui->TimeLineWifget;
     QVBoxLayout *layout = new QVBoxLayout(container);
     QListWidget *frameList = new QListWidget(container);
     frameList->setViewMode(QListWidget::IconMode);
     frameList->setIconSize(QSize(64, 64));
     frameList->setResizeMode(QListWidget::Adjust);
     frameList->setMovement(QListWidget::Static);
+    frameList->setDragDropMode(QAbstractItemView::InternalMove);
     layout->addWidget(frameList);
     container->setLayout(layout);
     frameList->setObjectName("frameListWidget");
@@ -191,37 +319,47 @@ void MainWindow::setupFrameLine()
         int index = item->data(Qt::UserRole).toInt();
         loadFrame(index);
         if (!m_animationTimer->isActive() && index >= 0 && index < m_frames.size()) {
-            m_spriteWidget->setFrame(m_frames[index]);
+            m_spriteWidget->setFrame(m_frames[index]->compositeImage());
+        }
+    });
+
+    connect(frameList->model(), &QAbstractItemModel::rowsMoved, this, [this]() {
+        QListWidget *list = ui->TimeLineWifget->findChild<QListWidget*>("frameListWidget");
+        if (!list) return;
+        QList<Frame*> newOrder;
+        for (int i = 0; i < list->count(); ++i) {
+            QListWidgetItem *item = list->item(i);
+            int oldIndex = item->data(Qt::UserRole).toInt();
+            newOrder.append(m_frames[oldIndex]);
+        }
+        m_frames = newOrder;
+        for (int i = 0; i < list->count(); ++i) {
+            list->item(i)->setData(Qt::UserRole, i);
+        }
+        if (m_currentFrameIndex != -1) {
+            m_currentFrameIndex = list->currentRow();
         }
     });
 }
 
 void MainWindow::updateFrameLine()
 {
-    QListWidget *frameList = ui->widget->findChild<QListWidget*>("frameListWidget");
+    QListWidget *frameList = ui->TimeLineWifget->findChild<QListWidget*>("frameListWidget");
     if (!frameList) return;
 
     frameList->clear();
     for (int i = 0; i < m_frames.size(); ++i) {
-        const auto &pixels = m_frames[i];
-        int h = pixels.size();
-        int w = h > 0 ? pixels[0].size() : 0;
-        QImage image(w, h, QImage::Format_ARGB32);
-        for (int y = 0; y < h; ++y) {
-            for (int x = 0; x < w; ++x) {
-                image.setPixelColor(x, y, pixels[y][x]);
-            }
-        }
-        QPixmap pixmap = QPixmap::fromImage(image.scaled(64, 64, Qt::KeepAspectRatio));
+        QImage img = m_frames[i]->compositeImage();
+        QPixmap pixmap = QPixmap::fromImage(img.scaled(64, 64, Qt::KeepAspectRatio));
         QListWidgetItem *item = new QListWidgetItem(QIcon(pixmap), QString("Кадр %1").arg(i+1));
         item->setData(Qt::UserRole, i);
         frameList->addItem(item);
     }
 
     bool hasFrames = !m_frames.isEmpty();
-    ui->prevframe->setEnabled(hasFrames);
-    ui->nextframe->setEnabled(hasFrames);
-    ui->pushButton->setEnabled(hasFrames);
+    ui->PrevFrameButton->setEnabled(hasFrames);
+    ui->NextFrameButton->setEnabled(hasFrames);
+    ui->StattButton->setEnabled(hasFrames);
 }
 
 void MainWindow::loadFrame(int index)
@@ -229,13 +367,38 @@ void MainWindow::loadFrame(int index)
     if (index < 0 || index >= m_frames.size())
         return;
     m_currentFrameIndex = index;
-    m_canvasWidget->setPixels(m_frames[index]);
+    refreshCanvasFromFrame();
+}
+
+void MainWindow::refreshCanvasFromFrame()
+{
+    Frame *frame = currentFrame();
+    if (!frame) return;
+    m_canvasWidget->setImage(frame->compositeImage());
     m_canvasWidget->clearGhostLayer();
+    updateLayerList();
+}
+
+Frame* MainWindow::currentFrame() const
+{
+    if (m_currentFrameIndex >= 0 && m_currentFrameIndex < m_frames.size())
+        return m_frames[m_currentFrameIndex];
+    return nullptr;
+}
+
+Layer* MainWindow::currentLayer() const
+{
+    Frame *frame = currentFrame();
+    if (!frame) return nullptr;
+    int row = m_layerList->currentRow();
+    if (row >= 0 && row < frame->layers().size())
+        return frame->layers()[row];
+    return nullptr;
 }
 
 void MainWindow::setupSpriteView()
 {
-    QWidget *spriteTab = ui->sprite;
+    QWidget *spriteTab = ui->SpriteTabe;
     QVBoxLayout *layout = new QVBoxLayout(spriteTab);
     m_spriteWidget = new SpriteWidget(spriteTab);
     layout->addWidget(m_spriteWidget);
@@ -244,23 +407,25 @@ void MainWindow::setupSpriteView()
 
 void MainWindow::onAddFrame()
 {
-    QVector<QVector<QColor>> currentPixels = m_canvasWidget->getPixelsCopy();
-    m_frames.append(currentPixels);
+    Frame *newFrame = new Frame(m_canvasSize);
+    newFrame->addLayer(new Layer("Фон", m_canvasSize));
+    m_frames.append(newFrame);
     m_currentFrameIndex = m_frames.size() - 1;
     updateFrameLine();
-
-    QVector<QVector<QColor>> ghost = m_canvasWidget->createGhostFromCurrent(0.5f);
-    m_canvasWidget->setCanvasSize(m_canvasWidget->canvasSize().width(),
-                                  m_canvasWidget->canvasSize().height());
-    m_canvasWidget->setGhostLayer(ghost);
-
-    m_spriteWidget->setFrame(currentPixels);
+    refreshCanvasFromFrame();
+    m_spriteWidget->setFrame(newFrame->compositeImage());
 }
 
 void MainWindow::onClearFrame()
 {
-    m_canvasWidget->setCanvasSize(m_canvasWidget->canvasSize().width(),
-                                  m_canvasWidget->canvasSize().height());
+    Frame *frame = currentFrame();
+    if (frame) {
+        for (Layer *layer : frame->layers()) {
+            layer->setImage(QImage(m_canvasSize, QImage::Format_ARGB32));
+            layer->image().fill(Qt::transparent);
+        }
+    }
+    refreshCanvasFromFrame();
     m_canvasWidget->clearGhostLayer();
 }
 
@@ -270,7 +435,7 @@ void MainWindow::onPreviousFrame()
     int newIndex = m_currentFrameIndex - 1;
     if (newIndex < 0) newIndex = m_frames.size() - 1;
     loadFrame(newIndex);
-    m_spriteWidget->setFrame(m_frames[newIndex]);
+    m_spriteWidget->setFrame(currentFrame()->compositeImage());
 }
 
 void MainWindow::onNextFrame()
@@ -279,7 +444,7 @@ void MainWindow::onNextFrame()
     int newIndex = m_currentFrameIndex + 1;
     if (newIndex >= m_frames.size()) newIndex = 0;
     loadFrame(newIndex);
-    m_spriteWidget->setFrame(m_frames[newIndex]);
+    m_spriteWidget->setFrame(currentFrame()->compositeImage());
 }
 
 void MainWindow::onPlayAnimation()
@@ -290,10 +455,10 @@ void MainWindow::onPlayAnimation()
     }
     m_animationTimer->start(1000 / m_animationFps);
     if (m_currentFrameIndex >= 0 && m_currentFrameIndex < m_frames.size()) {
-        m_spriteWidget->setFrame(m_frames[m_currentFrameIndex]);
+        m_spriteWidget->setFrame(currentFrame()->compositeImage());
     } else {
         m_currentFrameIndex = 0;
-        m_spriteWidget->setFrame(m_frames[0]);
+        m_spriteWidget->setFrame(m_frames[0]->compositeImage());
     }
 }
 
@@ -301,7 +466,7 @@ void MainWindow::onStopAnimation()
 {
     m_animationTimer->stop();
     if (m_currentFrameIndex >= 0 && m_currentFrameIndex < m_frames.size()) {
-        m_spriteWidget->setFrame(m_frames[m_currentFrameIndex]);
+        m_spriteWidget->setFrame(currentFrame()->compositeImage());
     }
 }
 
@@ -313,7 +478,7 @@ void MainWindow::onAnimationTick()
     }
     int newIndex = (m_currentFrameIndex + 1) % m_frames.size();
     m_currentFrameIndex = newIndex;
-    m_spriteWidget->setFrame(m_frames[newIndex]);
+    m_spriteWidget->setFrame(m_frames[newIndex]->compositeImage());
 }
 
 void MainWindow::onFpsChanged(int fps)
@@ -333,4 +498,230 @@ void MainWindow::updateStatusBar(const QColor &color)
     QPixmap pixmap(16, 16);
     pixmap.fill(color);
     m_statusColorIcon->setPixmap(pixmap);
+}
+
+void MainWindow::updateToolStatus(CanvasWidget::Tool tool)
+{
+    QString toolName;
+    switch (tool) {
+    case CanvasWidget::Brush: toolName = tr("Кисть"); break;
+    case CanvasWidget::Eraser: toolName = tr("Ластик"); break;
+    case CanvasWidget::Fill: toolName = tr("Заливка"); break;
+    case CanvasWidget::Picker: toolName = tr("Пипетка"); break;
+    case CanvasWidget::Rectangle: toolName = tr("Прямоугольник"); break;
+    case CanvasWidget::Ellipse: toolName = tr("Овал"); break;
+    case CanvasWidget::Line: toolName = tr("Линия"); break;
+    case CanvasWidget::Triangle: toolName = tr("Треугольник"); break;
+    default: toolName = tr("Неизвестно");
+    }
+    m_statusToolLabel->setText(tr("Инструмент: %1").arg(toolName));
+}
+
+void MainWindow::onNewLayer()
+{
+    Frame *frame = currentFrame();
+    if (!frame) return;
+    bool ok;
+    QString name = QInputDialog::getText(this, tr("Новый слой"), tr("Имя слоя:"), QLineEdit::Normal, tr("Слой %1").arg(frame->layers().size()+1), &ok);
+    if (!ok) return;
+    Layer *layer = new Layer(name, m_canvasSize);
+    frame->addLayer(layer);
+    updateLayerList();
+    refreshCanvasFromFrame();
+}
+
+void MainWindow::onDeleteLayer()
+{
+    int row = m_layerList->currentRow();
+    Frame *frame = currentFrame();
+    if (!frame || row < 0 || row >= frame->layers().size()) return;
+    if (frame->layers().size() <= 1) {
+        QMessageBox::warning(this, tr("Ошибка"), tr("Нельзя удалить последний слой."));
+        return;
+    }
+    frame->removeLayer(row);
+    updateLayerList();
+    refreshCanvasFromFrame();
+}
+
+void MainWindow::onLayerSelectionChanged()
+{
+    Layer *layer = currentLayer();
+    if (!layer) return;
+    QCheckBox *visibleCheck = m_layerDock->findChild<QCheckBox*>();
+    if (visibleCheck) {
+        visibleCheck->setChecked(layer->isVisible());
+    }
+    m_layerOpacitySlider->setValue(layer->opacity());
+}
+
+void MainWindow::onLayerVisibilityChanged(bool visible)
+{
+    Layer *layer = currentLayer();
+    if (layer) {
+        layer->setVisible(visible);
+        refreshCanvasFromFrame();
+    }
+}
+
+void MainWindow::onLayerOpacityChanged(int opacity)
+{
+    Layer *layer = currentLayer();
+    if (layer) {
+        layer->setOpacity(opacity);
+        refreshCanvasFromFrame();
+    }
+}
+
+void MainWindow::updateLayerList()
+{
+    Frame *frame = currentFrame();
+    if (!frame) return;
+    m_layerList->clear();
+    for (Layer *layer : frame->layers()) {
+        QListWidgetItem *item = new QListWidgetItem(layer->name());
+        item->setFlags(item->flags() | Qt::ItemIsEditable);
+        m_layerList->addItem(item);
+    }
+    if (frame->layers().size() > 0) {
+        m_layerList->setCurrentRow(0);
+    }
+}
+
+void MainWindow::onNewProject()
+{
+    bool ok;
+    int w = QInputDialog::getInt(this, tr("Новый проект"), tr("Ширина:"), 32, 1, 1024, 1, &ok);
+    if (!ok) return;
+    int h = QInputDialog::getInt(this, tr("Новый проект"), tr("Высота:"), 32, 1, 1024, 1, &ok);
+    if (!ok) return;
+
+    m_canvasSize = QSize(w, h);
+    m_canvasWidget->setCanvasSize(m_canvasSize);
+
+    qDeleteAll(m_frames);
+    m_frames.clear();
+    Frame *frame = new Frame(m_canvasSize);
+    frame->addLayer(new Layer("Фон", m_canvasSize));
+    m_frames.append(frame);
+    m_currentFrameIndex = 0;
+    refreshCanvasFromFrame();
+    updateFrameLine();
+    updateLayerList();
+    m_spriteWidget->setFrame(frame->compositeImage());
+}
+
+void MainWindow::onSaveProject()
+{
+    QString filename = QFileDialog::getSaveFileName(this, tr("Сохранить проект"), QString(), tr("Pixel Art Project (*.pap)"));
+    if (filename.isEmpty()) return;
+
+    QJsonObject root;
+    root["canvasSize"] = QJsonArray({m_canvasSize.width(), m_canvasSize.height()});
+    QJsonArray framesArray;
+    for (Frame *frame : m_frames) {
+        QJsonObject frameObj;
+        QJsonArray layersArray;
+        for (Layer *layer : frame->layers()) {
+            QJsonObject layerObj;
+            layerObj["name"] = layer->name();
+            layerObj["visible"] = layer->isVisible();
+            layerObj["opacity"] = layer->opacity();
+            QByteArray ba;
+            QBuffer buffer(&ba);
+            buffer.open(QIODevice::WriteOnly);
+            layer->image().save(&buffer, "PNG");
+            layerObj["data"] = QString(ba.toBase64());
+            layersArray.append(layerObj);
+        }
+        frameObj["layers"] = layersArray;
+        framesArray.append(frameObj);
+    }
+    root["frames"] = framesArray;
+
+    QFile file(filename);
+    if (file.open(QIODevice::WriteOnly)) {
+        file.write(QJsonDocument(root).toJson());
+    }
+}
+
+void MainWindow::onLoadProject()
+{
+    QString filename = QFileDialog::getOpenFileName(this, tr("Загрузить проект"), QString(), tr("Pixel Art Project (*.pap)"));
+    if (filename.isEmpty()) return;
+
+    QFile file(filename);
+    if (!file.open(QIODevice::ReadOnly)) return;
+
+    QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+    QJsonObject root = doc.object();
+    QJsonArray sizeArr = root["canvasSize"].toArray();
+    m_canvasSize = QSize(sizeArr[0].toInt(), sizeArr[1].toInt());
+    m_canvasWidget->setCanvasSize(m_canvasSize);
+
+    qDeleteAll(m_frames);
+    m_frames.clear();
+    QJsonArray framesArray = root["frames"].toArray();
+    for (const QJsonValue &frameVal : framesArray) {
+        QJsonObject frameObj = frameVal.toObject();
+        Frame *frame = new Frame(m_canvasSize);
+        QJsonArray layersArray = frameObj["layers"].toArray();
+        for (const QJsonValue &layerVal : layersArray) {
+            QJsonObject layerObj = layerVal.toObject();
+            QString name = layerObj["name"].toString();
+            bool visible = layerObj["visible"].toBool();
+            int opacity = layerObj["opacity"].toInt();
+            QByteArray ba = QByteArray::fromBase64(layerObj["data"].toString().toLatin1());
+            QImage img;
+            img.loadFromData(ba, "PNG");
+            Layer *layer = new Layer(name, m_canvasSize);
+            layer->setImage(img);
+            layer->setVisible(visible);
+            layer->setOpacity(opacity);
+            frame->addLayer(layer);
+        }
+        m_frames.append(frame);
+    }
+    if (m_frames.isEmpty()) {
+        Frame *frame = new Frame(m_canvasSize);
+        frame->addLayer(new Layer("Фон", m_canvasSize));
+        m_frames.append(frame);
+    }
+    m_currentFrameIndex = 0;
+    refreshCanvasFromFrame();
+    updateFrameLine();
+    updateLayerList();
+    m_spriteWidget->setFrame(currentFrame()->compositeImage());
+}
+
+void MainWindow::onExportSpriteSheet()
+{
+    if (m_frames.isEmpty()) return;
+    QString filename = QFileDialog::getSaveFileName(this, tr("Экспорт атласа"), QString(), tr("PNG (*.png)"));
+    if (filename.isEmpty()) return;
+
+    int cols = qMin(10, m_frames.size());
+    int rows = (m_frames.size() + cols - 1) / cols;
+    QImage atlas(m_canvasSize.width() * cols, m_canvasSize.height() * rows, QImage::Format_ARGB32);
+    atlas.fill(Qt::transparent);
+    QPainter painter(&atlas);
+    for (int i = 0; i < m_frames.size(); ++i) {
+        int row = i / cols;
+        int col = i % cols;
+        painter.drawImage(col * m_canvasSize.width(), row * m_canvasSize.height(), m_frames[i]->compositeImage());
+    }
+    painter.end();
+    atlas.save(filename);
+}
+
+void MainWindow::onCanvasChanged()
+{
+    Frame *frame = currentFrame();
+    if (!frame) return;
+    Layer *layer = currentLayer();
+    if (layer) {
+        layer->setImage(m_canvasWidget->image());
+    }
+    updateFrameLine();
+    m_spriteWidget->setFrame(frame->compositeImage());
 }

@@ -3,29 +3,34 @@
 
 #include <QWidget>
 #include <QImage>
-#include <QVector>
-#include <QColor>
+#include <QMouseEvent>
+#include <QWheelEvent>
 
-// Виджет для отображения одного кадра анимации (без возможности редактирования)
 class SpriteWidget : public QWidget
 {
     Q_OBJECT
 public:
     explicit SpriteWidget(QWidget *parent = nullptr);
 
-    // Установить кадр из двумерного массива цветов
-    void setFrame(const QVector<QVector<QColor>> &pixels);
-
-    // Очистить виджет (показать серый фон и надпись "Нет кадра")
+    void setFrame(const QImage &image);
     void clear();
+    void setPixelSize(int size);
+    int pixelSize() const { return m_pixelSize; }
+
+    QSize sizeHint() const override;
+    QSize minimumSizeHint() const override;
 
 protected:
     void paintEvent(QPaintEvent *event) override;
+    void mousePressEvent(QMouseEvent *event) override;
+    void mouseDoubleClickEvent(QMouseEvent *event) override;
+    void wheelEvent(QWheelEvent *event) override;
 
 private:
-    QImage m_image;          // Изображение кадра в исходном разрешении
-    QSize m_frameSize;       // Размер кадра (ширина/высота в пикселях)
-    int m_pixelSize = 10;    // Масштаб при отрисовке (можно сделать настраиваемым)
+    void drawCheckerboard(QPainter &painter, const QRect &rect);
+
+    QImage m_image;
+    int m_pixelSize = 10;
 };
 
 #endif // SPRITEWIDGET_H

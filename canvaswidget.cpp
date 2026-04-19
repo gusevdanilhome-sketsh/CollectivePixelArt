@@ -12,7 +12,7 @@ CanvasWidget::CanvasWidget(QWidget *parent)
 {
     setMouseTracking(true);
     setFixedSize(400, 400);
-    setCanvasSize(32, 32);
+    setCanvasSize(QSize(32, 32));
 }
 
 void CanvasWidget::setCurrentColor(const QColor &color)
@@ -33,75 +33,53 @@ void CanvasWidget::setPixelSize(int size)
     setFixedSize(m_canvasSize.width() * m_pixelSize,
                  m_canvasSize.height() * m_pixelSize);
     update();
+    emit pixelSizeChanged(m_pixelSize);
 }
 
-void CanvasWidget::setCanvasSize(int width, int height)
+void CanvasWidget::setCanvasSize(const QSize &size)
 {
-    m_canvasSize = QSize(width, height);
-    m_pixels.resize(height);
-    for (int i = 0; i < height; ++i) {
-        m_pixels[i].resize(width);
-        for (int j = 0; j < width; ++j) {
-            m_pixels[i][j] = Qt::transparent;
-        }
-    }
-    m_ghostPixels.clear();
-    setFixedSize(width * m_pixelSize, height * m_pixelSize);
+    m_canvasSize = size;
+    m_image = QImage(size, QImage::Format_ARGB32);
+    m_image.fill(Qt::transparent);
+    m_ghostImage = QImage();
+    setFixedSize(size.width() * m_pixelSize, size.height() * m_pixelSize);
     update();
     emit canvasChanged();
 }
 
-void CanvasWidget::setGhostLayer(const QVector<QVector<QColor>> &ghostPixels)
+void CanvasWidget::setImage(const QImage &image)
 {
-    if (ghostPixels.size() == m_canvasSize.height() &&
-        !ghostPixels.isEmpty() && ghostPixels[0].size() == m_canvasSize.width()) {
-        m_ghostPixels = ghostPixels;
+    if (image.size() != m_canvasSize) {
+        m_canvasSize = image.size();
+        setFixedSize(m_canvasSize.width() * m_pixelSize, m_canvasSize.height() * m_pixelSize);
+    }
+    m_image = image.convertToFormat(QImage::Format_ARGB32);
+    update();
+    emit canvasChanged();
+}
+
+void CanvasWidget::setGhostLayer(const QImage &ghost)
+{
+    if (ghost.size() == m_canvasSize) {
+        m_ghostImage = ghost;
     } else {
-        m_ghostPixels.clear();
+        m_ghostImage = QImage();
     }
     update();
 }
 
 void CanvasWidget::clearGhostLayer()
 {
-    m_ghostPixels.clear();
+    m_ghostImage = QImage();
     update();
-}
-
-QVector<QVector<QColor>> CanvasWidget::createGhostFromCurrent(float factor) const
-{
-    QVector<QVector<QColor>> ghost = m_pixels;
-    for (int y = 0; y < ghost.size(); ++y) {
-        for (int x = 0; x < ghost[y].size(); ++x) {
-            QColor &col = ghost[y][x];
-            if (col.alpha() > 0) {
-                int newAlpha = qBound(0, static_cast<int>(col.alpha() * factor), 255);
-                col.setAlpha(newAlpha);
-            }
-        }
-    }
-    return ghost;
-}
-
-QVector<QVector<QColor>> CanvasWidget::getPixelsCopy() const
-{
-    return m_pixels;
-}
-
-void CanvasWidget::setPixels(const QVector<QVector<QColor>> &pixels)
-{
-    if (pixels.size() == m_canvasSize.height() && !pixels.isEmpty() && pixels[0].size() == m_canvasSize.width()) {
-        m_pixels = pixels;
-        update();
-        emit canvasChanged();
-    }
 }
 
 void CanvasWidget::setTool(Tool tool)
 {
     m_currentTool = tool;
-    // При смене инструмента сбрасываем флаг рисования
     m_drawing = false;
+    m_shapeActive = false;
+    emit toolChanged(tool);
 }
 
 void CanvasWidget::setBrushSize(int size)
@@ -116,7 +94,7 @@ void CanvasWidget::drawPixel(const QPoint &pixelPos)
         return;
 
     QColor color(m_currentRgb.red(), m_currentRgb.green(), m_currentRgb.blue(), m_alpha);
-    m_pixels[pixelPos.y()][pixelPos.x()] = color;
+    m_image.setPixelColor(pixelPos, color);
     update();
     emit canvasChanged();
 }
@@ -124,14 +102,13 @@ void CanvasWidget::drawPixel(const QPoint &pixelPos)
 void CanvasWidget::drawBrush(const QPoint &centerPixel)
 {
     int radius = m_brushSize - 1;
+    QColor color(m_currentRgb.red(), m_currentRgb.green(), m_currentRgb.blue(), m_alpha);
     for (int dy = -radius; dy <= radius; ++dy) {
         for (int dx = -radius; dx <= radius; ++dx) {
-            // Квадратная кисть (можно заменить на круглую)
             QPoint pt(centerPixel.x() + dx, centerPixel.y() + dy);
             if (pt.x() >= 0 && pt.x() < m_canvasSize.width() &&
                 pt.y() >= 0 && pt.y() < m_canvasSize.height()) {
-                QColor color(m_currentRgb.red(), m_currentRgb.green(), m_currentRgb.blue(), m_alpha);
-                m_pixels[pt.y()][pt.x()] = color;
+                m_image.setPixelColor(pt, color);
             }
         }
     }
@@ -145,7 +122,7 @@ void CanvasWidget::eraseAt(const QPoint &pixelPos)
         pixelPos.y() < 0 || pixelPos.y() >= m_canvasSize.height())
         return;
 
-    m_pixels[pixelPos.y()][pixelPos.x()] = Qt::transparent;
+    m_image.setPixelColor(pixelPos, Qt::transparent);
     update();
     emit canvasChanged();
 }
@@ -156,11 +133,11 @@ void CanvasWidget::floodFill(const QPoint &startPixel)
         startPixel.y() < 0 || startPixel.y() >= m_canvasSize.height())
         return;
 
-    QColor targetColor = m_pixels[startPixel.y()][startPixel.x()];
+    QColor targetColor = m_image.pixelColor(startPixel);
     QColor fillColor(m_currentRgb.red(), m_currentRgb.green(), m_currentRgb.blue(), m_alpha);
 
     if (targetColor == fillColor)
-        return; // Уже залито этим цветом
+        return;
 
     QQueue<QPoint> queue;
     QSet<QPoint> visited;
@@ -169,9 +146,8 @@ void CanvasWidget::floodFill(const QPoint &startPixel)
 
     while (!queue.isEmpty()) {
         QPoint pt = queue.dequeue();
-        m_pixels[pt.y()][pt.x()] = fillColor;
+        m_image.setPixelColor(pt, fillColor);
 
-        // Соседи (4-связность)
         QPoint neighbors[4] = {
             QPoint(pt.x() + 1, pt.y()),
             QPoint(pt.x() - 1, pt.y()),
@@ -182,7 +158,7 @@ void CanvasWidget::floodFill(const QPoint &startPixel)
             if (n.x() >= 0 && n.x() < m_canvasSize.width() &&
                 n.y() >= 0 && n.y() < m_canvasSize.height() &&
                 !visited.contains(n) &&
-                m_pixels[n.y()][n.x()] == targetColor) {
+                m_image.pixelColor(n) == targetColor) {
                 queue.enqueue(n);
                 visited.insert(n);
             }
@@ -199,16 +175,226 @@ void CanvasWidget::pickColorAt(const QPoint &pixelPos)
         pixelPos.y() < 0 || pixelPos.y() >= m_canvasSize.height())
         return;
 
-    QColor picked = m_pixels[pixelPos.y()][pixelPos.x()];
+    QColor picked = m_image.pixelColor(pixelPos);
     if (picked.alpha() == 0) {
-        // Если пиксель прозрачный, можно выбрать белый или не менять. Выберем белый.
         picked = Qt::white;
     }
-    // Устанавливаем как текущий цвет (альфа остаётся прежней)
     m_currentRgb = picked;
     setAlpha(picked.alpha());
     emit colorPicked(picked);
     emit currentColorChanged(QColor(m_currentRgb.red(), m_currentRgb.green(), m_currentRgb.blue(), m_alpha));
+}
+
+void CanvasWidget::applyShape(const QPoint &start, const QPoint &end)
+{
+    if (start.x() < 0 || start.y() < 0 || end.x() < 0 || end.y() < 0)
+        return;
+
+    int x0 = start.x(), y0 = start.y();
+    int x1 = end.x(), y1 = end.y();
+    QColor color(m_currentRgb.red(), m_currentRgb.green(), m_currentRgb.blue(), m_alpha);
+
+    auto setPixel = [this](int x, int y, const QColor &c) {
+        if (x >= 0 && x < m_canvasSize.width() && y >= 0 && y < m_canvasSize.height())
+            m_image.setPixelColor(x, y, c);
+    };
+
+    if (m_currentTool == Rectangle) {
+        int xmin = qMin(x0, x1), xmax = qMax(x0, x1);
+        int ymin = qMin(y0, y1), ymax = qMax(y0, y1);
+        for (int x = xmin; x <= xmax; ++x) {
+            setPixel(x, ymin, color);
+            setPixel(x, ymax, color);
+        }
+        for (int y = ymin; y <= ymax; ++y) {
+            setPixel(xmin, y, color);
+            setPixel(xmax, y, color);
+        }
+    } else if (m_currentTool == Ellipse) {
+        int cx = (x0 + x1) / 2;
+        int cy = (y0 + y1) / 2;
+        int rx = qAbs(x1 - x0) / 2;
+        int ry = qAbs(y1 - y0) / 2;
+        if (rx == 0 || ry == 0) return;
+
+        int x = 0, y = ry;
+        int rx2 = rx * rx, ry2 = ry * ry;
+        int tworx2 = 2 * rx2, twory2 = 2 * ry2;
+        int p = ry2 - rx2 * ry + (rx2 >> 2);
+        int px = 0, py = tworx2 * y;
+
+        while (px < py) {
+            setPixel(cx + x, cy + y, color);
+            setPixel(cx - x, cy + y, color);
+            setPixel(cx + x, cy - y, color);
+            setPixel(cx - x, cy - y, color);
+            x++;
+            px += twory2;
+            if (p < 0)
+                p += ry2 + px;
+            else {
+                y--;
+                py -= tworx2;
+                p += ry2 + px - py;
+            }
+        }
+
+        p = ry2 * (x + 0.5) * (x + 0.5) + rx2 * (y - 1) * (y - 1) - rx2 * ry2;
+        while (y >= 0) {
+            setPixel(cx + x, cy + y, color);
+            setPixel(cx - x, cy + y, color);
+            setPixel(cx + x, cy - y, color);
+            setPixel(cx - x, cy - y, color);
+            y--;
+            py -= tworx2;
+            if (p > 0)
+                p += rx2 - py;
+            else {
+                x++;
+                px += twory2;
+                p += rx2 - py + px;
+            }
+        }
+    } else if (m_currentTool == Line) {
+        int dx = abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
+        int dy = -abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
+        int err = dx + dy, e2;
+        for (;;) {
+            setPixel(x0, y0, color);
+            if (x0 == x1 && y0 == y1) break;
+            e2 = 2 * err;
+            if (e2 >= dy) { err += dy; x0 += sx; }
+            if (e2 <= dx) { err += dx; y0 += sy; }
+        }
+    } else if (m_currentTool == Triangle) {
+        int x2 = x0, y2 = y1;
+        QPoint p0(x0, y0), p1(x1, y1), p2(x2, y2);
+        auto drawLine = [&](QPoint a, QPoint b) {
+            int dx = abs(b.x() - a.x()), sx = a.x() < b.x() ? 1 : -1;
+            int dy = -abs(b.y() - a.y()), sy = a.y() < b.y() ? 1 : -1;
+            int err = dx + dy, e2;
+            int x = a.x(), y = a.y();
+            for (;;) {
+                setPixel(x, y, color);
+                if (x == b.x() && y == b.y()) break;
+                e2 = 2 * err;
+                if (e2 >= dy) { err += dy; x += sx; }
+                if (e2 <= dx) { err += dx; y += sy; }
+            }
+        };
+        drawLine(p0, p1);
+        drawLine(p1, p2);
+        drawLine(p2, p0);
+    }
+
+    update();
+    emit canvasChanged();
+}
+
+void CanvasWidget::drawShapePreview(QPainter &painter)
+{
+    if (!m_shapeActive) return;
+
+    QPoint start = m_shapeStart;
+    QPoint end = m_shapeCurrent;
+    QColor color(m_currentRgb.red(), m_currentRgb.green(), m_currentRgb.blue(), 128);
+
+    auto drawPixel = [&](int x, int y) {
+        if (x >= 0 && x < m_canvasSize.width() && y >= 0 && y < m_canvasSize.height()) {
+            painter.fillRect(x * m_pixelSize, y * m_pixelSize, m_pixelSize, m_pixelSize, color);
+        }
+    };
+
+    int x0 = start.x(), y0 = start.y();
+    int x1 = end.x(), y1 = end.y();
+
+    if (m_currentTool == Rectangle) {
+        int xmin = qMin(x0, x1), xmax = qMax(x0, x1);
+        int ymin = qMin(y0, y1), ymax = qMax(y0, y1);
+        for (int x = xmin; x <= xmax; ++x) {
+            drawPixel(x, ymin);
+            drawPixel(x, ymax);
+        }
+        for (int y = ymin; y <= ymax; ++y) {
+            drawPixel(xmin, y);
+            drawPixel(xmax, y);
+        }
+    } else if (m_currentTool == Ellipse) {
+        int cx = (x0 + x1) / 2;
+        int cy = (y0 + y1) / 2;
+        int rx = qAbs(x1 - x0) / 2;
+        int ry = qAbs(y1 - y0) / 2;
+        if (rx == 0 || ry == 0) return;
+
+        int x = 0, y = ry;
+        int rx2 = rx * rx, ry2 = ry * ry;
+        int tworx2 = 2 * rx2, twory2 = 2 * ry2;
+        int p = ry2 - rx2 * ry + (rx2 >> 2);
+        int px = 0, py = tworx2 * y;
+
+        while (px < py) {
+            drawPixel(cx + x, cy + y);
+            drawPixel(cx - x, cy + y);
+            drawPixel(cx + x, cy - y);
+            drawPixel(cx - x, cy - y);
+            x++;
+            px += twory2;
+            if (p < 0)
+                p += ry2 + px;
+            else {
+                y--;
+                py -= tworx2;
+                p += ry2 + px - py;
+            }
+        }
+
+        p = ry2 * (x + 0.5) * (x + 0.5) + rx2 * (y - 1) * (y - 1) - rx2 * ry2;
+        while (y >= 0) {
+            drawPixel(cx + x, cy + y);
+            drawPixel(cx - x, cy + y);
+            drawPixel(cx + x, cy - y);
+            drawPixel(cx - x, cy - y);
+            y--;
+            py -= tworx2;
+            if (p > 0)
+                p += rx2 - py;
+            else {
+                x++;
+                px += twory2;
+                p += rx2 - py + px;
+            }
+        }
+    } else if (m_currentTool == Line) {
+        int dx = abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
+        int dy = -abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
+        int err = dx + dy, e2;
+        for (;;) {
+            drawPixel(x0, y0);
+            if (x0 == x1 && y0 == y1) break;
+            e2 = 2 * err;
+            if (e2 >= dy) { err += dy; x0 += sx; }
+            if (e2 <= dx) { err += dx; y0 += sy; }
+        }
+    } else if (m_currentTool == Triangle) {
+        int x2 = x0, y2 = y1;
+        QPoint p0(x0, y0), p1(x1, y1), p2(x2, y2);
+        auto drawLine = [&](QPoint a, QPoint b) {
+            int dx = abs(b.x() - a.x()), sx = a.x() < b.x() ? 1 : -1;
+            int dy = -abs(b.y() - a.y()), sy = a.y() < b.y() ? 1 : -1;
+            int err = dx + dy, e2;
+            int x = a.x(), y = a.y();
+            for (;;) {
+                drawPixel(x, y);
+                if (x == b.x() && y == b.y()) break;
+                e2 = 2 * err;
+                if (e2 >= dy) { err += dy; x += sx; }
+                if (e2 <= dx) { err += dx; y += sy; }
+            }
+        };
+        drawLine(p0, p1);
+        drawLine(p1, p2);
+        drawLine(p2, p0);
+    }
 }
 
 void CanvasWidget::paintEvent(QPaintEvent *event)
@@ -216,11 +402,10 @@ void CanvasWidget::paintEvent(QPaintEvent *event)
     QPainter painter(this);
     drawCheckerboard(painter);
 
-    // Фоновый слой
-    if (!m_ghostPixels.isEmpty()) {
+    if (!m_ghostImage.isNull()) {
         for (int y = 0; y < m_canvasSize.height(); ++y) {
             for (int x = 0; x < m_canvasSize.width(); ++x) {
-                const QColor &col = m_ghostPixels[y][x];
+                QColor col = m_ghostImage.pixelColor(x, y);
                 if (col.alpha() > 0) {
                     painter.fillRect(x * m_pixelSize, y * m_pixelSize,
                                      m_pixelSize, m_pixelSize, col);
@@ -229,10 +414,9 @@ void CanvasWidget::paintEvent(QPaintEvent *event)
         }
     }
 
-    // Основной слой
     for (int y = 0; y < m_canvasSize.height(); ++y) {
         for (int x = 0; x < m_canvasSize.width(); ++x) {
-            const QColor &col = m_pixels[y][x];
+            QColor col = m_image.pixelColor(x, y);
             if (col.alpha() > 0) {
                 painter.fillRect(x * m_pixelSize, y * m_pixelSize,
                                  m_pixelSize, m_pixelSize, col);
@@ -240,7 +424,8 @@ void CanvasWidget::paintEvent(QPaintEvent *event)
         }
     }
 
-    // Сетка
+    drawShapePreview(painter);
+
     painter.setPen(QPen(Qt::black, 1));
     for (int x = 0; x <= m_canvasSize.width(); ++x) {
         painter.drawLine(x * m_pixelSize, 0, x * m_pixelSize, height());
@@ -278,42 +463,56 @@ void CanvasWidget::mousePressEvent(QMouseEvent *event)
         QPoint pixel = pixelFromPoint(event->pos());
         if (pixel.x() < 0) return;
 
-        m_drawing = true;
-        m_lastDrawnPixel = pixel;
+        if (m_currentTool == Rectangle || m_currentTool == Ellipse ||
+            m_currentTool == Line || m_currentTool == Triangle) {
+            m_shapeStart = pixel;
+            m_shapeCurrent = pixel;
+            m_shapeActive = true;
+            update();
+        } else {
+            m_drawing = true;
+            m_lastDrawnPixel = pixel;
 
-        switch (m_currentTool) {
-        case Brush:
-            if (m_brushSize == 1)
-                drawPixel(pixel);
-            else
-                drawBrush(pixel);
-            break;
-        case Eraser:
-            eraseAt(pixel);
-            break;
-        case Fill:
-            floodFill(pixel);
-            m_drawing = false; // заливка однократная
-            break;
-        case Picker:
-            pickColorAt(pixel);
-            m_drawing = false;
-            break;
+            switch (m_currentTool) {
+            case Brush:
+                if (m_brushSize == 1)
+                    drawPixel(pixel);
+                else
+                    drawBrush(pixel);
+                break;
+            case Eraser:
+                eraseAt(pixel);
+                break;
+            case Fill:
+                floodFill(pixel);
+                m_drawing = false;
+                break;
+            case Picker:
+                pickColorAt(pixel);
+                m_drawing = false;
+                break;
+            default:
+                break;
+            }
         }
     }
 }
 
 void CanvasWidget::mouseMoveEvent(QMouseEvent *event)
 {
-    if (!m_drawing || !(event->buttons() & Qt::LeftButton))
-        return;
-
     QPoint pixel = pixelFromPoint(event->pos());
     if (pixel.x() < 0) return;
 
-    // Для кисти и ластика рисуем линию между последней точкой и текущей (сглаживание)
+    if (m_shapeActive) {
+        m_shapeCurrent = pixel;
+        update();
+        return;
+    }
+
+    if (!m_drawing || !(event->buttons() & Qt::LeftButton))
+        return;
+
     if (m_currentTool == Brush || m_currentTool == Eraser) {
-        // Алгоритм Брезенхэма для рисования линии между двумя пикселями
         int x0 = m_lastDrawnPixel.x();
         int y0 = m_lastDrawnPixel.y();
         int x1 = pixel.x();
@@ -353,6 +552,11 @@ void CanvasWidget::mouseMoveEvent(QMouseEvent *event)
 void CanvasWidget::mouseReleaseEvent(QMouseEvent *event)
 {
     if (event->button() == Qt::LeftButton) {
+        if (m_shapeActive) {
+            applyShape(m_shapeStart, m_shapeCurrent);
+            m_shapeActive = false;
+            update();
+        }
         m_drawing = false;
     }
 }
@@ -375,4 +579,10 @@ void CanvasWidget::wheelEvent(QWheelEvent *event)
     } else {
         event->ignore();
     }
+}
+
+void CanvasWidget::resizeEvent(QResizeEvent *event)
+{
+    QWidget::resizeEvent(event);
+    emit sizeChanged(size());
 }

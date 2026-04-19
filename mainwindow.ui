@@ -38,18 +38,18 @@
   <property name="windowTitle">
    <string>MainWindow</string>
   </property>
-  <widget class="QWidget" name="centralwidget">
+  <widget class="QWidget" name="MainWidget">
    <layout class="QGridLayout" name="gridLayout">
     <item row="0" column="0">
-     <widget class="QSplitter" name="splitter_2">
+     <widget class="QSplitter" name="MainVerticalSpliter">
       <property name="orientation">
        <enum>Qt::Orientation::Vertical</enum>
       </property>
-      <widget class="QSplitter" name="splitter">
+      <widget class="QSplitter" name="MainHorizontalSpliter">
        <property name="orientation">
         <enum>Qt::Orientation::Horizontal</enum>
        </property>
-       <widget class="QTabWidget" name="filecontrol">
+       <widget class="QTabWidget" name="LeftPanel">
         <property name="sizePolicy">
          <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
           <horstretch>0</horstretch>
@@ -69,55 +69,91 @@
          </size>
         </property>
         <property name="currentIndex">
-         <number>1</number>
+         <number>0</number>
         </property>
-        <widget class="QWidget" name="files">
+        <widget class="QWidget" name="FileTabe">
          <attribute name="title">
           <string>Файлы</string>
          </attribute>
+         <layout class="QGridLayout" name="gridLayout_11">
+          <item row="0" column="0">
+           <layout class="QVBoxLayout" name="FileVerticalSpliter" stretch="0,0,1">
+            <item>
+             <layout class="QHBoxLayout" name="FileHorizontalSpliter">
+              <item>
+               <widget class="QPushButton" name="ChangingDirectoryButton">
+                <property name="text">
+                 <string>Смена директории</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="UpdateButton">
+                <property name="text">
+                 <string>Обновить</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <widget class="QLineEdit" name="SearchFile"/>
+            </item>
+            <item>
+             <widget class="QTreeWidget" name="TreeFile">
+              <column>
+               <property name="text">
+                <string notr="true">1</string>
+               </property>
+              </column>
+             </widget>
+            </item>
+           </layout>
+          </item>
+         </layout>
         </widget>
-        <widget class="QWidget" name="cvs">
+        <widget class="QWidget" name="VCSTabe">
          <attribute name="title">
           <string>CVS</string>
          </attribute>
         </widget>
        </widget>
-       <widget class="QTabWidget" name="framecontrol">
+       <widget class="QTabWidget" name="MiddlePanel">
         <property name="currentIndex">
-         <number>1</number>
+         <number>0</number>
         </property>
-        <widget class="QWidget" name="convas">
+        <widget class="QWidget" name="ConvasTabe">
          <attribute name="title">
           <string>Холст</string>
          </attribute>
          <layout class="QGridLayout" name="gridLayout_2">
           <item row="0" column="0">
-           <layout class="QVBoxLayout" name="verticalLayout">
+           <layout class="QVBoxLayout" name="ConvasVerticalSpliter">
             <item>
-             <layout class="QHBoxLayout" name="horizontalLayout">
+             <layout class="QHBoxLayout" name="ConvasHorizontalSplitter">
               <item>
-               <widget class="QPushButton" name="addframes">
+               <widget class="QPushButton" name="AddFramesButton">
                 <property name="text">
                  <string>Добавить кадр</string>
                 </property>
                </widget>
               </item>
               <item>
-               <widget class="QPushButton" name="clearframes">
+               <widget class="QPushButton" name="ClearFramesButton">
                 <property name="text">
                  <string>Очистить</string>
                 </property>
                </widget>
               </item>
               <item>
-               <widget class="QPushButton" name="prevframe">
+               <widget class="QPushButton" name="PrevFrameButton">
                 <property name="text">
                  <string>Предыдущий</string>
                 </property>
                </widget>
               </item>
               <item>
-               <widget class="QPushButton" name="nextframe">
+               <widget class="QPushButton" name="NextFrameButton">
                 <property name="text">
                  <string>Следующий</string>
                 </property>
@@ -126,16 +162,16 @@
              </layout>
             </item>
             <item>
-             <widget class="QScrollArea" name="scrollAreaCanvas">
+             <widget class="QScrollArea" name="CanvasScrollArea">
               <property name="widgetResizable">
                <bool>true</bool>
               </property>
-              <widget class="QWidget" name="m_canvas">
+              <widget class="QWidget" name="ConvasWidget">
                <property name="geometry">
                 <rect>
                  <x>0</x>
                  <y>0</y>
-                 <width>868</width>
+                 <width>1072</width>
                  <height>620</height>
                 </rect>
                </property>
@@ -146,13 +182,18 @@
           </item>
          </layout>
         </widget>
-        <widget class="QWidget" name="sprite">
+        <widget class="QWidget" name="SpriteTabe">
          <attribute name="title">
           <string>Спрайт</string>
          </attribute>
+         <layout class="QGridLayout" name="gridLayout_10">
+          <item row="0" column="0">
+           <widget class="QWidget" name="SpriteWidget" native="true"/>
+          </item>
+         </layout>
         </widget>
        </widget>
-       <widget class="QTabWidget" name="toolcontrol">
+       <widget class="QTabWidget" name="RightPanel">
         <property name="sizePolicy">
          <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
           <horstretch>0</horstretch>
@@ -174,117 +215,124 @@
         <property name="currentIndex">
          <number>1</number>
         </property>
-        <widget class="QWidget" name="colors">
+        <widget class="QWidget" name="ColorsTab">
          <attribute name="title">
           <string>Цвет</string>
          </attribute>
          <layout class="QGridLayout" name="gridLayout_3">
-          <item row="3" column="0">
-           <widget class="QLabel" name="alfa_colors">
-            <property name="minimumSize">
-             <size>
-              <width>0</width>
-              <height>25</height>
-             </size>
-            </property>
-            <property name="maximumSize">
-             <size>
-              <width>16777215</width>
-              <height>25</height>
-             </size>
-            </property>
-            <property name="text">
-             <string>Альфа канал</string>
-            </property>
-           </widget>
-          </item>
-          <item row="4" column="0">
-           <widget class="QSpinBox" name="spinBox">
-            <property name="maximum">
-             <number>100</number>
-            </property>
-           </widget>
-          </item>
-          <item row="2" column="0">
-           <widget class="QWidget" name="palette" native="true"/>
-          </item>
-          <item row="1" column="0">
-           <widget class="QSpinBox" name="palettesize">
-            <property name="minimum">
-             <number>1</number>
-            </property>
-            <property name="maximum">
-             <number>32</number>
-            </property>
-            <property name="singleStep">
-             <number>1</number>
-            </property>
-            <property name="value">
-             <number>16</number>
-            </property>
-           </widget>
-          </item>
           <item row="0" column="0">
-           <widget class="QLabel" name="bit_colors">
-            <property name="minimumSize">
-             <size>
-              <width>0</width>
-              <height>25</height>
-             </size>
+           <layout class="QVBoxLayout" name="ColorsVerticalSpliter" stretch="0,0,1,0,0">
+            <property name="spacing">
+             <number>6</number>
             </property>
-            <property name="maximumSize">
-             <size>
-              <width>16777215</width>
-              <height>25</height>
-             </size>
-            </property>
-            <property name="text">
-             <string>Разрядность палитры</string>
-            </property>
-           </widget>
+            <item>
+             <widget class="QLabel" name="BitDepthLabel">
+              <property name="minimumSize">
+               <size>
+                <width>0</width>
+                <height>25</height>
+               </size>
+              </property>
+              <property name="maximumSize">
+               <size>
+                <width>16777215</width>
+                <height>25</height>
+               </size>
+              </property>
+              <property name="text">
+               <string>Разрядность палитры</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QSpinBox" name="BitDepthSpin">
+              <property name="minimum">
+               <number>1</number>
+              </property>
+              <property name="maximum">
+               <number>32</number>
+              </property>
+              <property name="singleStep">
+               <number>1</number>
+              </property>
+              <property name="value">
+               <number>16</number>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QWidget" name="PaletteWidget" native="true"/>
+            </item>
+            <item>
+             <widget class="QLabel" name="AlfaChannelLabel">
+              <property name="minimumSize">
+               <size>
+                <width>0</width>
+                <height>25</height>
+               </size>
+              </property>
+              <property name="maximumSize">
+               <size>
+                <width>16777215</width>
+                <height>25</height>
+               </size>
+              </property>
+              <property name="text">
+               <string>Альфа канал</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QSpinBox" name="AlfaChannelSpin">
+              <property name="maximum">
+               <number>100</number>
+              </property>
+             </widget>
+            </item>
+           </layout>
           </item>
          </layout>
         </widget>
-        <widget class="QWidget" name="tools">
+        <widget class="QWidget" name="ToolsTabe">
          <attribute name="title">
           <string>Инструменты</string>
          </attribute>
-         <layout class="QGridLayout" name="gridLayout_8">
+         <layout class="QGridLayout" name="gridLayout_7">
           <item row="0" column="0">
-           <layout class="QVBoxLayout" name="verticalLayout_5">
+           <layout class="QVBoxLayout" name="ToolsVerticalSpliter" stretch="0,0,1,0">
             <item>
-             <layout class="QHBoxLayout" name="horizontalLayout_4">
+             <layout class="QHBoxLayout" name="ToolsHorizontalSpliter">
               <item>
-               <widget class="QGroupBox" name="tools_standart">
+               <widget class="QGroupBox" name="StandartGroup">
                 <property name="title">
                  <string>Инструменты</string>
                 </property>
                 <layout class="QGridLayout" name="gridLayout_5">
                  <item row="0" column="0">
-                  <layout class="QVBoxLayout" name="verticalLayout_3">
+                  <layout class="QVBoxLayout" name="StandartVerticalSpliber">
                    <item>
-                    <widget class="QPushButton" name="toolBrush">
+                    <widget class="QPushButton" name="BrushButton">
                      <property name="text">
                       <string>Кисть</string>
                      </property>
                     </widget>
                    </item>
                    <item>
-                    <widget class="QPushButton" name="toolEraser">
+                    <widget class="QPushButton" name="EraserButton">
                      <property name="text">
                       <string>Ластик</string>
                      </property>
                     </widget>
                    </item>
                    <item>
-                    <widget class="QPushButton" name="toolFill">
+                    <widget class="QPushButton" name="FillButton">
                      <property name="text">
                       <string>Заливка</string>
                      </property>
                     </widget>
                    </item>
                    <item>
-                    <widget class="QPushButton" name="toolPicker">
+                    <widget class="QPushButton" name="PickerButton">
                      <property name="text">
                       <string>Пипетка</string>
                      </property>
@@ -296,38 +344,45 @@
                </widget>
               </item>
               <item>
-               <widget class="QGroupBox" name="tools_primitiv">
+               <widget class="QGroupBox" name="PrimitivGroup">
                 <property name="title">
                  <string>Примитивы</string>
                 </property>
                 <layout class="QGridLayout" name="gridLayout_6">
                  <item row="0" column="0">
-                  <layout class="QVBoxLayout" name="verticalLayout_4">
+                  <layout class="QVBoxLayout" name="PrimitivVerticalSpliter">
                    <item>
-                    <widget class="QPushButton" name="toolBrush_2">
+                    <widget class="QPushButton" name="RectangleButton">
                      <property name="text">
                       <string>Прямоугольник</string>
                      </property>
                     </widget>
                    </item>
                    <item>
-                    <widget class="QPushButton" name="toolEraser_2">
+                    <widget class="QPushButton" name="TextButton">
+                     <property name="text">
+                      <string>Текст</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item>
+                    <widget class="QPushButton" name="OvalButton">
                      <property name="text">
                       <string>Овал</string>
                      </property>
                     </widget>
                    </item>
                    <item>
-                    <widget class="QPushButton" name="toolFill_2">
+                    <widget class="QPushButton" name="LineButton">
                      <property name="text">
                       <string>Линия</string>
                      </property>
                     </widget>
                    </item>
                    <item>
-                    <widget class="QPushButton" name="toolPicker_2">
+                    <widget class="QPushButton" name="TriangleButton">
                      <property name="text">
-                      <string>Триугольник</string>
+                      <string>Треугольник</string>
                      </property>
                     </widget>
                    </item>
@@ -339,26 +394,87 @@
              </layout>
             </item>
             <item>
-             <widget class="QGroupBox" name="groupBox_2">
-              <property name="title">
-               <string>Размер кисти</string>
+             <layout class="QHBoxLayout" name="BrushSizeHorizontalSpliter" stretch="0,1">
+              <item>
+               <widget class="QLabel" name="BrushSizeLabel">
+                <property name="text">
+                 <string>Размер кисти:</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QSpinBox" name="BrushSizeSpin"/>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <widget class="QWidget" name="NavigationWidget" native="true"/>
+            </item>
+            <item>
+             <widget class="QSlider" name="NavigationSlider">
+              <property name="orientation">
+               <enum>Qt::Orientation::Horizontal</enum>
               </property>
-              <layout class="QGridLayout" name="gridLayout_7">
-               <item row="0" column="0">
-                <layout class="QHBoxLayout" name="horizontalLayout_5">
-                 <item>
-                  <widget class="QLabel" name="label_2">
-                   <property name="text">
-                    <string>Размер:</string>
-                   </property>
-                  </widget>
-                 </item>
-                 <item>
-                  <widget class="QSpinBox" name="brushSizeSpinBox"/>
-                 </item>
-                </layout>
-               </item>
-              </layout>
+             </widget>
+            </item>
+           </layout>
+          </item>
+         </layout>
+        </widget>
+        <widget class="QWidget" name="LayerTabe">
+         <attribute name="title">
+          <string>Слои</string>
+         </attribute>
+         <layout class="QGridLayout" name="gridLayout_9">
+          <item row="0" column="0">
+           <layout class="QVBoxLayout" name="verticalLayout_6" stretch="1,0,0,0,0">
+            <item>
+             <widget class="QFrame" name="frame">
+              <property name="frameShape">
+               <enum>QFrame::Shape::StyledPanel</enum>
+              </property>
+              <property name="frameShadow">
+               <enum>QFrame::Shadow::Raised</enum>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <layout class="QHBoxLayout" name="horizontalLayout_6">
+              <item>
+               <widget class="QPushButton" name="pushButton_6">
+                <property name="text">
+                 <string>+</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="pushButton_7">
+                <property name="text">
+                 <string>-</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <widget class="QCheckBox" name="checkBox">
+              <property name="text">
+               <string>Видимый</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLabel" name="label_3">
+              <property name="text">
+               <string>Прозрачность:</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QSlider" name="horizontalSlider">
+              <property name="orientation">
+               <enum>Qt::Orientation::Horizontal</enum>
+              </property>
              </widget>
             </item>
            </layout>
@@ -367,7 +483,7 @@
         </widget>
        </widget>
       </widget>
-      <widget class="QTabWidget" name="animecontrol">
+      <widget class="QTabWidget" name="DownPanel">
        <property name="sizePolicy">
         <sizepolicy hsizetype="Expanding" vsizetype="Minimum">
          <horstretch>0</horstretch>
@@ -389,31 +505,31 @@
        <property name="currentIndex">
         <number>0</number>
        </property>
-       <widget class="QWidget" name="frameline">
+       <widget class="QWidget" name="TimeLineTabe">
         <attribute name="title">
          <string>Кадровая дорожка</string>
         </attribute>
         <layout class="QGridLayout" name="gridLayout_4">
          <item row="0" column="0">
-          <layout class="QHBoxLayout" name="horizontalLayout_3" stretch="0,1">
+          <layout class="QHBoxLayout" name="TimeLineHorizontalSpliter" stretch="0,1">
            <item>
-            <layout class="QVBoxLayout" name="verticalLayout_2">
+            <layout class="QVBoxLayout" name="TimeLineVerticalSpliter">
              <item>
-              <widget class="QPushButton" name="pushButton">
+              <widget class="QPushButton" name="StattButton">
                <property name="text">
                 <string>Воспроизвести</string>
                </property>
               </widget>
              </item>
              <item>
-              <widget class="QPushButton" name="pushButton_2">
+              <widget class="QPushButton" name="StopButton">
                <property name="text">
                 <string>Остановить</string>
                </property>
               </widget>
              </item>
              <item>
-              <layout class="QHBoxLayout" name="horizontalLayout_2" stretch="0,1">
+              <layout class="QHBoxLayout" name="FPSHorizontalSpliter" stretch="0,1">
                <item>
                 <widget class="QLabel" name="fps">
                  <property name="text">
@@ -431,28 +547,28 @@
               </layout>
              </item>
              <item>
-              <widget class="QPushButton" name="pushButton_3">
+              <widget class="QPushButton" name="ExportButton">
                <property name="text">
-                <string>PushButton</string>
+                <string>Экспорт</string>
                </property>
               </widget>
              </item>
              <item>
-              <widget class="QPushButton" name="pushButton_4">
+              <widget class="QPushButton" name="ImportButton">
                <property name="text">
-                <string>PushButton</string>
+                <string>Импорт</string>
                </property>
               </widget>
              </item>
              <item>
-              <widget class="QPushButton" name="pushButton_5">
+              <widget class="QPushButton" name="DeletFrameButton">
                <property name="text">
-                <string>PushButton</string>
+                <string>Удалить кадр</string>
                </property>
               </widget>
              </item>
              <item>
-              <widget class="QLabel" name="label">
+              <widget class="QLabel" name="StatusLabel">
                <property name="text">
                 <string>TextLabel</string>
                </property>
@@ -461,16 +577,11 @@
             </layout>
            </item>
            <item>
-            <widget class="QWidget" name="widget" native="true"/>
+            <widget class="QWidget" name="TimeLineWifget" native="true"/>
            </item>
           </layout>
          </item>
         </layout>
-       </widget>
-       <widget class="QWidget" name="settings">
-        <attribute name="title">
-         <string>Настройки</string>
-        </attribute>
        </widget>
       </widget>
      </widget>
