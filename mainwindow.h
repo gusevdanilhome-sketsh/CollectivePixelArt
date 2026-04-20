@@ -2,12 +2,6 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
-#include <QList>
-#include <QLabel>
-#include <QTimer>
-#include "canvaswidget.h"
-#include "colorpalette.h"
-#include "spritewidget.h"   // <-- новый заголовок
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -24,37 +18,46 @@ public:
     ~MainWindow() override;
 
 private slots:
-    void onAddFrame();
-    void onClearFrame();
-    void onPreviousFrame();
-    void onNextFrame();
+    // Кадры
+    void on_AddFramesButton_clicked();
+    void on_ClearFramesButton_clicked();
+    void on_PrevFrameButton_clicked();
+    void on_NextFrameButton_clicked();
+    void on_DeletFrameButton_clicked();
 
-    void onPlayAnimation();
-    void onStopAnimation();
-    void onAnimationTick();
-    void onFpsChanged(int fps);
+    // Анимация
+    void on_StattButton_clicked();
+    void on_StopButton_clicked();
+    void on_num_fps_valueChanged(int fps);
 
-    void updateStatusBar(const QColor &color);
+    // Файлы
+    void on_ChangingDirectoryButton_clicked();
+    void on_UpdateButton_clicked();
+    void on_SearchFile_textChanged(const QString &text);
+
+    // Слои
+    void on_IncrementButton_clicked();
+    void on_DecrementButton_clicked();
+    void on_VisibilityCheck_toggled(bool checked);
+    void on_TransparencySlider_valueChanged(int value);
+
+    // Инструменты (если нужны действия, иначе можно не подключать)
+    void on_BrushButton_clicked();
+    void on_EraserButton_clicked();
+    void on_FillButton_clicked();
+    void on_PickerButton_clicked();
+    void on_BrushSizeSpin_valueChanged(int size);
+
+    // Цвет
+    void on_BitDepthSpin_valueChanged(int size);
+    void on_AlfaChannelSpin_valueChanged(int value);
+
+    // Экспорт/импорт
+    void on_ExportButton_clicked();
+    void on_ImportButton_clicked();
 
 private:
-    void setupFrameLine();
-    void updateFrameLine();
-    void loadFrame(int index);
-    void setupSpriteView();
-
     Ui::MainWindow *ui;
-    CanvasWidget *m_canvasWidget;
-    ColorPalette *m_colorPalette;
-    SpriteWidget *m_spriteWidget;   // <-- виджет для предпросмотра
-
-    QList<QVector<QVector<QColor>>> m_frames;
-    int m_currentFrameIndex = -1;
-
-    QLabel *m_statusColorLabel;
-    QLabel *m_statusColorIcon;
-
-    QTimer *m_animationTimer;
-    int m_animationFps = 12;
 };
 
 #endif // MAINWINDOW_H
